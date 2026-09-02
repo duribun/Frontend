@@ -11,7 +11,7 @@ import { PillButton } from '@/components/auth/pill-button';
 
 type Gender = 'female' | 'male';
 
-const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]{2,6}$/;
+const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]{2,10}$/;
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
@@ -51,7 +51,7 @@ export default function ProfileSetupScreen() {
         </Pressable>
 
         <Text style={styles.title}>닉네임을 입력해주세요</Text>
-        <Text style={styles.subtitle}>2~6자, 한글/영문/숫자만 가능</Text>
+        <Text style={styles.subtitle}>2~10자, 한글/영문/숫자만 가능</Text>
 
         <View style={styles.nicknameRow}>
           <TextInput
@@ -60,7 +60,7 @@ export default function ProfileSetupScreen() {
             onChangeText={handleChangeNickname}
             placeholder="닉네임 입력"
             placeholderTextColor="#828282"
-            maxLength={6}
+            maxLength={10}
             autoCapitalize="none"
           />
           <Pressable
