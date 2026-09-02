@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -103,11 +104,20 @@ export default function ProfileSetupScreen() {
           />
         </View>
 
-        <Text style={styles.sectionLabel}>캐릭터를 선택해주세요</Text>
-        {/* TODO: 실제 캐릭터 일러스트(Figma 디자인)로 교체 필요. 지금은 아이콘 placeholder. */}
+        <Text style={styles.sectionLabel}>성별</Text>
         <View style={styles.genderRow}>
-          <CharacterCard label="여자" selected={gender === 'female'} icon="woman" onPress={() => setGender('female')} />
-          <CharacterCard label="남자" selected={gender === 'male'} icon="man" onPress={() => setGender('male')} />
+          <CharacterCard
+            label="여자"
+            selected={gender === 'female'}
+            source={require('@/assets/images/onboarding/character-female.png')}
+            onPress={() => setGender('female')}
+          />
+          <CharacterCard
+            label="남자"
+            selected={gender === 'male'}
+            source={require('@/assets/images/onboarding/character-male.png')}
+            onPress={() => setGender('male')}
+          />
         </View>
 
         <View style={styles.spacer} />
@@ -121,25 +131,27 @@ export default function ProfileSetupScreen() {
 function CharacterCard({
   label,
   selected,
-  icon,
+  source,
   onPress,
 }: {
   label: string;
   selected: boolean;
-  icon: 'woman' | 'man';
+  source: ComponentProps<typeof Image>['source'];
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={styles.characterCard}>
-      <View style={[styles.characterAvatar, selected && styles.characterAvatarSelected]}>
-        <Ionicons name={icon} size={40} color={selected ? '#FFFFFF' : '#828282'} />
-        {selected && (
-          <View style={styles.checkBadge}>
-            <Ionicons name="checkmark" size={12} color="#FFFFFF" />
-          </View>
-        )}
-      </View>
-      <Text style={[styles.characterLabel, selected && styles.characterLabelSelected]}>{label}</Text>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      accessibilityLabel={label}
+      style={[styles.characterCard, selected && styles.characterCardSelected]}>
+      <Image source={source} style={styles.characterImage} contentFit="contain" />
+      {selected && (
+        <View style={styles.checkBadge}>
+          <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -224,27 +236,27 @@ const styles = StyleSheet.create({
   genderRow: {
     marginTop: 12,
     flexDirection: 'row',
-    gap: 16,
+    gap: 11,
   },
   characterCard: {
-    alignItems: 'center',
-    gap: 8,
+    flex: 1,
+    height: 190,
+    borderRadius: 26,
+    backgroundColor: 'rgba(251,255,251,0.92)',
+    overflow: 'hidden',
+    padding: 10,
   },
-  characterAvatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  characterCardSelected: {
+    borderWidth: 3,
+    borderColor: '#4A7CD6',
   },
-  characterAvatarSelected: {
-    backgroundColor: '#7FB0E6',
+  characterImage: {
+    flex: 1,
   },
   checkBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
+    top: 8,
+    right: 8,
     width: 22,
     height: 22,
     borderRadius: 11,
@@ -253,14 +265,6 @@ const styles = StyleSheet.create({
     borderColor: '#FEFEFE',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  characterLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#EDEDED',
-  },
-  characterLabelSelected: {
-    color: '#FEFEFE',
   },
   spacer: {
     flex: 1,
