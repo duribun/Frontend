@@ -2,19 +2,19 @@ import type { FC } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import type { SvgProps } from 'react-native-svg';
 
-import AppleIcon from '@/assets/icons/auth/apple.svg';
 import GoogleIcon from '@/assets/icons/auth/google.svg';
 import KakaoIcon from '@/assets/icons/auth/kakao.svg';
+import NaverIcon from '@/assets/icons/auth/naver.svg';
 
-export type SocialProvider = 'google' | 'kakao' | 'apple';
+export type SocialProvider = 'google' | 'kakao' | 'naver';
 
 const ICONS: Record<SocialProvider, FC<SvgProps>> = {
   google: GoogleIcon,
   kakao: KakaoIcon,
-  apple: AppleIcon,
+  naver: NaverIcon,
 };
 
-const PROVIDERS: SocialProvider[] = ['google', 'kakao', 'apple'];
+const PROVIDERS: SocialProvider[] = ['google', 'kakao', 'naver'];
 
 type SocialRowProps = {
   onSelect: (provider: SocialProvider) => void;
