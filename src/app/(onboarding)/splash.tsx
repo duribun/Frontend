@@ -27,10 +27,11 @@ export default function SplashScreen() {
   }));
 
   function handleSocialSignIn(provider: SocialProvider) {
-    // TEMP: BE 소셜 로그인 연동 전까지는 버튼 클릭 시 바로 로그인 후 화면으로 이동한다.
+    // TEMP: BE 소셜 로그인 연동 전까지는 버튼 클릭 시 바로 다음 온보딩 단계로 이동한다.
     // TODO: BE 연동되면 이 부분을 실제 provider OAuth → socialLogin(provider, token) 호출로 교체.
+    // TODO: 최초 로그인이 아닌 경우(재로그인) profile-setup을 건너뛰고 (tabs)로 바로 보내는 분기 추가.
     console.log(`[auth] TEMP bypass login as ${provider}`);
-    router.replace('/(tabs)');
+    router.replace('/(onboarding)/profile-setup');
   }
 
   return (
