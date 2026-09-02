@@ -12,7 +12,6 @@ export function AuthBackground({ source, children }: AuthBackgroundProps) {
     <View style={styles.container}>
       <StatusBar style="light" />
       <Image source={source} style={styles.background} contentFit="cover" />
-      <View style={styles.overlay} pointerEvents="none" />
       {children}
     </View>
   );
@@ -25,9 +24,5 @@ const styles = StyleSheet.create({
   },
   background: {
     ...StyleSheet.absoluteFill,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.33)',
   },
 });
