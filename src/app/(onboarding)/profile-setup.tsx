@@ -5,7 +5,6 @@ import { useState, type ComponentProps } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import BackArrowIcon from '@/assets/icons/auth/back-arrow.svg';
 import { AuthBackground } from '@/components/auth/auth-background';
 import { PillButton } from '@/components/auth/pill-button';
 
@@ -46,10 +45,6 @@ export default function ProfileSetupScreen() {
   return (
     <AuthBackground source={require('@/assets/images/onboarding/scenic-bg.jpg')} overlay>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} hitSlop={8} style={styles.backButton}>
-          <BackArrowIcon width={24} height={24} />
-        </Pressable>
-
         <Text style={styles.title}>닉네임을 입력해주세요</Text>
         <Text style={styles.subtitle}>2~10자, 한글/영문/숫자만 가능</Text>
 
@@ -162,13 +157,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 21,
     paddingBottom: 24,
   },
-  backButton: {
-    marginTop: 12,
-    width: 24,
-    height: 24,
-  },
   title: {
-    marginTop: 20,
+    marginTop: 24,
     fontSize: 22,
     fontWeight: '700',
     color: '#FAFDFF',
