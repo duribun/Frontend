@@ -1,105 +1,117 @@
 import { Image } from 'expo-image';
-import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { AuthBackground } from '@/components/auth/auth-background';
+import { SocialRow, type SocialProvider } from '@/components/auth/social-row';
+
+// TODO: 자동로그인(토큰 재발급) 체크가 붙으면 이 타이머 대신 그 결과로 ready를 바꾼다.
 const LOADING_DURATION_MS = 2200;
 
 export default function SplashScreen() {
   const router = useRouter();
+  const [ready, setReady] = useState(false);
   const progress = useSharedValue(0);
 
   useEffect(() => {
-    progress.value = withTiming(
-      1,
-      { duration: LOADING_DURATION_MS, easing: Easing.out(Easing.cubic) },
-      (finished) => {
-        if (finished) {
-          runOnJS(router.replace)('/(onboarding)/sign-in');
-        }
-      },
-    );
-  }, [progress, router]);
+    progress.value = withTiming(1, { duration: LOADING_DURATION_MS, easing: Easing.out(Easing.cubic) });
+    const timer = setTimeout(() => setReady(true), LOADING_DURATION_MS);
+    return () => clearTimeout(timer);
+  }, [progress]);
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
   }));
 
+  function handleSocialSignIn(provider: SocialProvider) {
+    // TEMP: BE 소셜 로그인 연동 전까지는 버튼 클릭 시 바로 로그인 후 화면으로 이동한다.
+    // TODO: BE 연동되면 이 부분을 실제 provider OAuth → socialLogin(provider, token) 호출로 교체.
+    console.log(`[auth] TEMP bypass login as ${provider}`);
+    router.replace('/(tabs)');
+  }
+
   return (
-    <View style={styles.container}>
-      <StatusBar style="dark" />
-      <Image
-        source={require('@/assets/images/onboarding/scenic-bg.jpg')}
-        style={styles.background}
-        contentFit="cover"
-      />
-
-      <View style={styles.titleWrap}>
-        <Image
-          source={require('@/assets/images/onboarding/splash-title.png')}
-          style={styles.title}
-          contentFit="contain"
-        />
-      </View>
-
-      <View style={styles.loadingWrap}>
-        <Text style={styles.loadingLabel}>Loading &middot;&middot;&middot;</Text>
-        <View style={styles.track}>
-          <Animated.View style={[styles.fill, fillStyle]} />
+    <AuthBackground source={require('@/assets/images/onboarding/scenic-bg.jpg')}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.logoWrap}>
+          <Image
+            source={require('@/assets/images/onboarding/splash-title.png')}
+            style={styles.logo}
+            contentFit="contain"
+          />
         </View>
-      </View>
-    </View>
+
+        <View style={styles.bottomSection}>
+          {!ready ? (
+            <Animated.View exiting={FadeOut.duration(250)} style={styles.loadingWrap}>
+              <Text style={styles.loadingLabel}>Loading &middot;&middot;&middot;</Text>
+              <View style={styles.track}>
+                <Animated.View style={[styles.fill, fillStyle]} />
+              </View>
+            </Animated.View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(300)} style={styles.socialSection}>
+              <Text style={styles.socialLabel}>SNS 계정으로 로그인</Text>
+              <SocialRow onSelect={handleSocialSignIn} />
+            </Animated.View>
+          )}
+        </View>
+      </SafeAreaView>
+    </AuthBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#8FCBEF',
+    paddingHorizontal: 21,
+    paddingBottom: 48,
   },
-  background: {
-    ...StyleSheet.absoluteFill,
-  },
-  titleWrap: {
-    position: 'absolute',
-    top: '20%',
-    left: '9%',
-    right: '9%',
+  logoWrap: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  title: {
-    width: '100%',
+  logo: {
+    width: 280,
     aspectRatio: 323.45 / 169,
   },
+  bottomSection: {
+    minHeight: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loadingWrap: {
-    position: 'absolute',
-    bottom: '12%',
-    left: 0,
-    right: 0,
     alignItems: 'center',
     gap: 10,
   },
   loadingLabel: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#432D07',
-    letterSpacing: -0.5,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FEFEFE',
   },
   track: {
-    width: 239,
-    height: 39,
-    borderRadius: 20,
-    backgroundColor: '#FBEFA3',
-    borderWidth: 1,
-    borderColor: '#67582E',
-    padding: 4,
+    width: 200,
+    height: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.35)',
     overflow: 'hidden',
   },
   fill: {
     height: '100%',
-    borderRadius: 999,
+    borderRadius: 8,
     backgroundColor: '#C8DA77',
+  },
+  socialSection: {
+    alignItems: 'center',
+    gap: 16,
+  },
+  socialLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FEFEFE',
   },
 });
