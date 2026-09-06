@@ -1,0 +1,18 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="naver 아이콘" filter="url(#filter0_d_0_naver)">
+<circle id="Ellipse" cx="30" cy="28" r="26" fill="#03C75A"/>
+<path id="N" d="M34.2 18H39V38H34.2L25.8 26.2V38H21V18H25.8L34.2 29.8V18Z" fill="white"/>
+</g>
+<defs>
+<filter id="filter0_d_0_naver" x="0" y="0" width="60" height="60" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="2"/>
+<feGaussianBlur stdDeviation="2"/>
+<feComposite in2="hardAlpha" operator="out"/>
+<feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"/>
+<feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_0_naver"/>
+<feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_0_naver" result="shape"/>
+</filter>
+</defs>
+</svg>
