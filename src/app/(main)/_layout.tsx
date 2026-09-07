@@ -5,6 +5,9 @@ export default function MainLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="map" />
+      <Stack.Screen name="collection" />
+      <Stack.Screen name="collection-mascot" />
+      <Stack.Screen name="collection-stamp" />
     </Stack>
   );
 }
