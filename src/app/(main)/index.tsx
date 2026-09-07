@@ -39,7 +39,7 @@ export default function MainScreen() {
   }
 
   function handleShop() {
-    // TODO: wire up to the shop flow once that screen exists.
+    router.push('/(main)/shop');
   }
 
   function handleSettings() {
