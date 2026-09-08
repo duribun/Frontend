@@ -5,6 +5,9 @@ export default function MainLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="map" />
+      <Stack.Screen name="record/index" />
+      <Stack.Screen name="record/write" />
+      <Stack.Screen name="record/[id]" />
     </Stack>
   );
 }

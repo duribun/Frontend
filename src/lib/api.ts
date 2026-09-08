@@ -67,4 +67,155 @@ export function saveProfile(payload: SaveProfileRequest): Promise<SaveProfileRes
   });
 }
 
+// ---- record (여행 기록) ----
+
+export type Weather = 'CLEAR' | 'SNOW' | 'RAIN' | 'THUNDER' | 'WIND' | 'CLOUDY';
+export type Mood = 'EXCITED' | 'HAPPY' | 'NEUTRAL' | 'SAD' | 'DISTRESSED';
+
+export type RecordSummary = {
+  id: number;
+  title: string;
+  content: string;
+  thumbnailUrl: string | null;
+  visitedAt: string;
+  placeName: string | null;
+  favorite: boolean;
+};
+
+export type RecordDetail = {
+  id: number;
+  title: string;
+  content: string;
+  imageUrls: string[];
+  visitedAt: string;
+  placeName: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  weather: Weather;
+  temperature: number;
+  mood: Mood;
+  favorite: boolean;
+};
+
+export type RecordPlace = {
+  placeName: string;
+  latitude: number;
+  longitude: number;
+};
+
+export type RecordInput = {
+  title: string;
+  content: string;
+  imageUrls?: string[];
+  visitedAt: string;
+  place?: RecordPlace | null; // null/미지정 = 장소 미등록 (all-or-nothing이라 이름/좌표를 묶어서 받는다)
+  weather: Weather;
+  temperature: number;
+  mood: Mood;
+};
+
+type RecordRequestBody = {
+  title: string;
+  content: string;
+  imageUrls: string[];
+  visitedAt: string;
+  placeName: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  weather: Weather;
+  temperature: number;
+  mood: Mood;
+};
+
+function toRecordRequestBody(input: RecordInput): RecordRequestBody {
+  return {
+    title: input.title,
+    content: input.content,
+    imageUrls: input.imageUrls ?? [],
+    visitedAt: input.visitedAt,
+    placeName: input.place?.placeName ?? null,
+    latitude: input.place?.latitude ?? null,
+    longitude: input.place?.longitude ?? null,
+    weather: input.weather,
+    temperature: input.temperature,
+    mood: input.mood,
+  };
+}
+
+export function listRecords(year: number, month: number): Promise<RecordSummary[]> {
+  return request<RecordSummary[]>(`/api/records/me?year=${year}&month=${month}`);
+}
+
+export function getRecord(recordId: number): Promise<RecordDetail> {
+  return request<RecordDetail>(`/api/records/${recordId}`);
+}
+
+export function createRecord(input: RecordInput): Promise<RecordDetail> {
+  return request<RecordDetail>('/api/records', {
+    method: 'POST',
+    body: JSON.stringify(toRecordRequestBody(input)),
+  });
+}
+
+export function updateRecord(recordId: number, input: RecordInput): Promise<RecordDetail> {
+  return request<RecordDetail>(`/api/records/${recordId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(toRecordRequestBody(input)),
+  });
+}
+
+export function deleteRecord(recordId: number): Promise<void> {
+  return request<void>(`/api/records/${recordId}`, { method: 'DELETE' });
+}
+
+export function toggleRecordFavorite(recordId: number): Promise<RecordDetail> {
+  return request<RecordDetail>(`/api/records/${recordId}/favorite`, { method: 'PATCH' });
+}
+
+type PresignedUploadUrlResponse = {
+  uploadUrl: string;
+  imageUrl: string;
+};
+
+const EXTENSION_CONTENT_TYPE: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+};
+
+function getFileExtension(uri: string): string {
+  const match = /\.([a-zA-Z0-9]+)$/.exec(uri);
+  return (match?.[1] ?? 'jpg').toLowerCase();
+}
+
+/**
+ * 로컬 이미지(uri)를 S3에 업로드하고 최종 접근 URL을 반환한다.
+ * 1) presigned URL 발급 2) 발급받은 uploadUrl로 직접 PUT 업로드 (우리 API 서버를 거치지 않음).
+ */
+export async function uploadRecordImage(localUri: string): Promise<string> {
+  const extension = getFileExtension(localUri);
+  const contentType = EXTENSION_CONTENT_TYPE[extension] ?? 'image/jpeg';
+
+  const { uploadUrl, imageUrl } = await request<PresignedUploadUrlResponse>(
+    `/api/records/images/presigned-url?extension=${extension}`,
+    { method: 'POST' },
+  );
+
+  const fileResponse = await fetch(localUri);
+  const fileBlob = await fileResponse.blob();
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: fileBlob,
+  });
+
+  if (!uploadResponse.ok) {
+    throw new ApiError(uploadResponse.status, `S3 이미지 업로드 실패: ${uploadResponse.status}`);
+  }
+
+  return imageUrl;
+}
+
 export { ApiError };

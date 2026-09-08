@@ -1,6 +1,6 @@
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -56,7 +56,10 @@ export default function MainScreen() {
   ).current;
 
   function handleDiary() {
-    // TODO: wire up to the record (여행 기록) flow once that screen exists.
+    // NOTE: 이 세션에서는 아직 로컬 router.d.ts(typed routes)에 신규 record 라우트가 반영되지 않아
+    // `as Href`로 캐스팅해둠. expo start/run:android를 한 번 실행하면 자동으로 타입이 갱신되면서
+    // 캐스팅 없이도 타입 체크가 통과한다 (런타임 동작에는 영향 없음).
+    router.push('/(main)/record' as Href);
   }
 
   function handleFrame() {
