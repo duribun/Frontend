@@ -75,6 +75,7 @@ export type Mood = 'EXCITED' | 'HAPPY' | 'NEUTRAL' | 'SAD' | 'DISTRESSED';
 export type RecordSummary = {
   id: number;
   title: string;
+  content: string;
   thumbnailUrl: string | null;
   visitedAt: string;
   placeName: string | null;

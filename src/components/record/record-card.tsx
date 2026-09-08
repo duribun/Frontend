@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { RecordSummary } from '@/lib/api';
-import { RECORD_TITLE_PREVIEW_LENGTH, truncate } from '@/lib/truncate';
+import { RECORD_TITLE_PREVIEW_LENGTH, recordContentPreviewLength, truncate } from '@/lib/truncate';
 
 type RecordCardProps = {
   record: RecordSummary;
@@ -11,6 +11,8 @@ type RecordCardProps = {
 
 export function RecordCard({ record, onPress }: RecordCardProps) {
   const title = record.title.length > 0 ? truncate(record.title, RECORD_TITLE_PREVIEW_LENGTH) : '(제목 없음)';
+  const hasPhoto = record.thumbnailUrl !== null;
+  const content = truncate(record.content, recordContentPreviewLength(hasPhoto));
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
@@ -29,6 +31,11 @@ export function RecordCard({ record, onPress }: RecordCardProps) {
           </Text>
           {record.favorite && <Text style={styles.favoriteMark}>★</Text>}
         </View>
+        {content.length > 0 && (
+          <Text style={styles.content} numberOfLines={1}>
+            {content}
+          </Text>
+        )}
         {record.placeName && (
           <Text style={styles.place} numberOfLines={1}>
             📍 {record.placeName}
@@ -79,6 +86,10 @@ const styles = StyleSheet.create({
   favoriteMark: {
     fontSize: 14,
     color: '#E8B84B',
+  },
+  content: {
+    fontSize: 13,
+    color: '#666666',
   },
   place: {
     fontSize: 12,
