@@ -5,12 +5,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthBackground } from '@/components/auth/auth-background';
 import { PillButton } from '@/components/auth/pill-button';
+import { useUserProfile } from '@/context/user-profile-context';
 
 export default function LocationReadyScreen() {
   const router = useRouter();
+  const { setShouldShowGuide } = useUserProfile();
 
   function handleStart() {
-    router.replace('/(tabs)');
+    // 최초 온보딩(프로필 설정 → 위치 인증)을 마치고 처음 메인에 들어가는 시점이므로
+    // 온보딩 가이드를 1회 띄우도록 플래그를 세워둔다.
+    setShouldShowGuide(true);
+    router.replace('/(main)');
   }
 
   return (
