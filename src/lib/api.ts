@@ -146,6 +146,11 @@ export function listRecords(year: number, month: number): Promise<RecordSummary[
   return request<RecordSummary[]>(`/api/records/me?year=${year}&month=${month}`);
 }
 
+// year/month를 아예 안 보내면 필터 없이 전체 기록이 반환된다 (프로필 화면의 "기록 개수" 계산용).
+export function listAllRecords(): Promise<RecordSummary[]> {
+  return request<RecordSummary[]>('/api/records/me');
+}
+
 export function getRecord(recordId: number): Promise<RecordDetail> {
   return request<RecordDetail>(`/api/records/${recordId}`);
 }
@@ -216,6 +221,53 @@ export async function uploadRecordImage(localUri: string): Promise<string> {
   }
 
   return imageUrl;
+}
+
+// ---- profile (프로필 화면) ----
+
+export type MyProfile = {
+  nickname: string;
+  birthDate: string | null;
+  gender: Gender | null;
+};
+
+export function getMyProfile(): Promise<MyProfile> {
+  return request<MyProfile>('/api/users/me');
+}
+
+export type Mascot = {
+  mascotId: number;
+  name: string;
+  imageUrl: string;
+  acquiredAt: string;
+};
+
+export function getMyMascots(): Promise<Mascot[]> {
+  return request<Mascot[]>('/api/mascots/me');
+}
+
+export type Badge = {
+  code: string;
+  name: string;
+  description: string;
+  iconUrl: string;
+  requiredMascotCount: number;
+  acquiredAt: string;
+};
+
+// requiredMascotCount 내림차순으로 정렬되어 내려온다. 첫 항목이 곧 "현재 칭호"(가장 높은 단계).
+export function getMyBadges(): Promise<Badge[]> {
+  return request<Badge[]>('/api/badges/me');
+}
+
+export type VisitedRegion = {
+  regionId: number;
+  regionName: string;
+  visitedAt: string;
+};
+
+export function getVisitedRegions(): Promise<VisitedRegion[]> {
+  return request<VisitedRegion[]>('/api/locations/visits');
 }
 
 export { ApiError };
