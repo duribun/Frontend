@@ -10,6 +10,7 @@ import SettingsIcon from '@/assets/icons/main/settings.svg';
 import { CoinBadge } from '@/components/main/coin-badge';
 import { IconButton } from '@/components/main/icon-button';
 import { OnboardingGuide } from '@/components/onboarding/onboarding-guide';
+import { ProfileOverlay } from '@/components/profile/profile-overlay';
 import { useUserProfile } from '@/context/user-profile-context';
 
 const SWIPE_THRESHOLD = 60;
@@ -32,6 +33,7 @@ export default function MainScreen() {
   const { profile, shouldShowGuide, setShouldShowGuide } = useUserProfile();
   const gender = profile.gender ?? 'FEMALE';
   const [guideVisible, setGuideVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
@@ -75,7 +77,7 @@ export default function MainScreen() {
   }
 
   function handleProfile() {
-    // TODO: wire up to the profile flow once that screen exists.
+    setProfileVisible(true);
   }
 
   function handleRefreshRegionName() {
@@ -164,6 +166,7 @@ export default function MainScreen() {
       </View>
 
       <OnboardingGuide visible={guideVisible} onFinish={() => setGuideVisible(false)} />
+      <ProfileOverlay visible={profileVisible} onClose={() => setProfileVisible(false)} />
     </View>
   );
 }
