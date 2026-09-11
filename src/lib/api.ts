@@ -225,10 +225,14 @@ export async function uploadRecordImage(localUri: string): Promise<string> {
 
 // ---- profile (프로필 화면) ----
 
+export type AuthProvider = 'GOOGLE' | 'KAKAO' | 'NAVER';
+
 export type MyProfile = {
   nickname: string;
   birthDate: string | null;
   gender: Gender | null;
+  // 가입 시 사용한 소셜 provider, 불변값 (연동/해제 기능 없음) — 설정 > 로그인 계정 화면에서 읽기 전용으로 표시.
+  provider: AuthProvider;
 };
 
 export function getMyProfile(): Promise<MyProfile> {
@@ -268,6 +272,18 @@ export type VisitedRegion = {
 
 export function getVisitedRegions(): Promise<VisitedRegion[]> {
   return request<VisitedRegion[]>('/api/locations/visits');
+}
+
+// ---- 설정 화면 ----
+
+// NOTE: 소셜 로그인이 아직 TEMP 바이패스라 리프레시 토큰을 들고 있지 않다 (getAccessToken()도 항상 null).
+// 실제 로그인 연동 전까지는 이 호출이 성공하더라도 의미 있는 세션 종료는 아니다 (docs/API-NEEDS-설정.md 3번 참고).
+export function logout(): Promise<void> {
+  return request<void>('/api/auth/logout', { method: 'POST' });
+}
+
+export function withdrawAccount(): Promise<void> {
+  return request<void>('/api/settings/me/withdraw', { method: 'DELETE' });
 }
 
 export { ApiError };
