@@ -73,7 +73,8 @@ export default function MainScreen() {
   }
 
   function handleSettings() {
-    // TODO: wire up to the settings flow once that screen exists.
+    // NOTE: 신규 settings 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅 (handleDiary와 동일 사유).
+    router.push('/(main)/settings' as Href);
   }
 
   function handleProfile() {
