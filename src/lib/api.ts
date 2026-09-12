@@ -274,6 +274,43 @@ export function getVisitedRegions(): Promise<VisitedRegion[]> {
   return request<VisitedRegion[]>('/api/locations/visits');
 }
 
+// ---- location (위치 인증) ----
+// NOTE: 이 함수를 실제로 호출하는 화면(메인 화면 수집 아이콘 `handleFrame`, GPS 기반
+// 관광지 방문 인증 플로우) 자체는 아직 FE에 구현되어 있지 않다 (docs/ISSUE-BGM-구현.md 참고).
+// 후속 "수집 기능 구현" 이슈에서 이 함수를 호출하고, 응답의 newlyAcquiredMascots가
+// 비어있지 않으면 useSoundSettings().playMascotAcquiredSound()를 호출해 효과음을 재생한다.
+
+export type VerifyLocationRequest = {
+  regionId: number;
+  latitude: number;
+  longitude: number;
+};
+
+export type NewlyAcquiredMascot = {
+  mascotId: number;
+  name: string;
+  imageUrl: string;
+};
+
+export type VerifyLocationResponse = {
+  verified: boolean;
+  isFirstVisit: boolean;
+  regionId: number;
+  regionName: string;
+  distanceMeters: number;
+  // 이번 호출로 새로 지급된 마스코트. Region과 마스코트가 1:1 매핑이라 항상 0개 또는 1개.
+  // 마스코트 지급은 동기 처리라 이 응답을 받는 시점에 이미 완료돼 있다 — 별도로
+  // getMyMascots()를 재조회할 필요가 없다. verified/isFirstVisit이 false면 항상 빈 배열.
+  newlyAcquiredMascots: NewlyAcquiredMascot[];
+};
+
+export function verifyLocation(payload: VerifyLocationRequest): Promise<VerifyLocationResponse> {
+  return request<VerifyLocationResponse>('/api/locations/verify', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 // ---- 설정 화면 ----
 
 // NOTE: 소셜 로그인이 아직 TEMP 바이패스라 리프레시 토큰을 들고 있지 않다 (getAccessToken()도 항상 null).
