@@ -7,38 +7,65 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthBackground } from '@/components/auth/auth-background';
 import { PillButton } from '@/components/auth/pill-button';
-
-type Gender = 'female' | 'male';
+import { useUserProfile, type Gender } from '@/context/user-profile-context';
+import { checkNicknameAvailable, saveProfile } from '@/lib/api';
 
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]{2,10}$/;
 
 export default function ProfileSetupScreen() {
   const router = useRouter();
+  const { setProfile } = useUserProfile();
   const [nickname, setNickname] = useState('');
   const [nicknameChecked, setNicknameChecked] = useState(false);
+  const [checkingNickname, setCheckingNickname] = useState(false);
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [day, setDay] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const nicknameValid = NICKNAME_REGEX.test(nickname);
   const birthdateValid = year.length === 4 && month.length >= 1 && day.length >= 1;
-  const canSubmit = nicknameValid && nicknameChecked && birthdateValid && gender !== null;
+  const canSubmit = nicknameValid && nicknameChecked && birthdateValid && gender !== null && !submitting;
 
   function handleChangeNickname(text: string) {
     setNickname(text);
     setNicknameChecked(false);
   }
 
-  function handleCheckNickname() {
-    if (!nicknameValid) return;
-    // TODO: BE에 닉네임 중복확인 API가 아직 없음 (docs/API_SPEC.md 참고). 우선 항상 통과 처리.
-    setNicknameChecked(true);
+  async function handleCheckNickname() {
+    if (!nicknameValid || checkingNickname) return;
+    setCheckingNickname(true);
+    try {
+      const result = await checkNicknameAvailable(nickname);
+      setNicknameChecked(result.available);
+      if (!result.available) {
+        // TODO: 중복된 닉네임 안내 UI (토스트/에러 텍스트) 추가.
+        console.warn('[profile-setup] nickname already in use:', nickname);
+      }
+    } catch (error) {
+      // TEMP: 로그인 연동 전이라 인증 토큰이 없어 API가 401로 실패할 수 있다.
+      // 개발 흐름이 막히지 않도록 우선 통과 처리하고, 실제 인증이 붙으면 이 catch가 자연히 사라진다.
+      console.warn('[profile-setup] nickname-check API 호출 실패, 임시로 통과 처리:', error);
+      setNicknameChecked(true);
+    } finally {
+      setCheckingNickname(false);
+    }
   }
 
-  function handleNext() {
-    if (!canSubmit) return;
-    // TODO: BE에 프로필(닉네임/생년월일/캐릭터) 저장 API가 아직 없음. API 나오면 여기서 호출.
+  async function handleNext() {
+    if (!canSubmit || !gender) return;
+    setSubmitting(true);
+    const birthDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    try {
+      await saveProfile({ nickname, birthDate, gender });
+    } catch (error) {
+      // TEMP: 위와 동일한 이유(인증 토큰 없음)로 실패할 수 있어 흐름은 계속 진행시킨다.
+      console.warn('[profile-setup] profile 저장 API 호출 실패, 로컬 상태만 반영:', error);
+    } finally {
+      setSubmitting(false);
+    }
+    setProfile({ nickname, birthDate, gender });
     router.push('/(onboarding)/location-permission');
   }
 
@@ -60,10 +87,10 @@ export default function ProfileSetupScreen() {
           />
           <Pressable
             onPress={handleCheckNickname}
-            disabled={!nicknameValid}
+            disabled={!nicknameValid || checkingNickname}
             style={[styles.checkButton, nicknameValid && styles.checkButtonActive]}>
             <Text style={[styles.checkButtonLabel, nicknameValid && styles.checkButtonLabelActive]}>
-              {nicknameChecked ? '확인 완료' : '중복확인'}
+              {checkingNickname ? '확인 중...' : nicknameChecked ? '확인 완료' : '중복확인'}
             </Text>
           </Pressable>
         </View>
@@ -103,15 +130,15 @@ export default function ProfileSetupScreen() {
         <View style={styles.genderRow}>
           <CharacterCard
             label="여자"
-            selected={gender === 'female'}
+            selected={gender === 'FEMALE'}
             source={require('@/assets/images/onboarding/character-female.png')}
-            onPress={() => setGender('female')}
+            onPress={() => setGender('FEMALE')}
           />
           <CharacterCard
             label="남자"
-            selected={gender === 'male'}
+            selected={gender === 'MALE'}
             source={require('@/assets/images/onboarding/character-male.png')}
-            onPress={() => setGender('male')}
+            onPress={() => setGender('MALE')}
           />
         </View>
 

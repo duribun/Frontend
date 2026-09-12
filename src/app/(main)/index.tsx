@@ -1,7 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
-import { useRef } from 'react';
+import { useRouter, type Href } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,14 +9,41 @@ import RefreshIcon from '@/assets/icons/main/refresh.svg';
 import SettingsIcon from '@/assets/icons/main/settings.svg';
 import { CoinBadge } from '@/components/main/coin-badge';
 import { IconButton } from '@/components/main/icon-button';
+import { OnboardingGuide } from '@/components/onboarding/onboarding-guide';
+import { ProfileOverlay } from '@/components/profile/profile-overlay';
+import { useUserProfile } from '@/context/user-profile-context';
 
 const SWIPE_THRESHOLD = 60;
 
+// TODO: 메인 화면 아트 스타일에 맞는 실제 남자 캐릭터/프로필 에셋이 아직 없어서
+// 온보딩 카드용 character-male.png를 임시로 재사용한다 (docs/ISSUE-캐릭터성별연동-온보딩가이드.md 참고).
+// 실제 에셋이 나오면 assets/images/main/character-boy.png, profile-boy.png로 교체하고 이 매핑만 갈아끼우면 된다.
+const CHARACTER_SOURCE = {
+  FEMALE: require('@/assets/images/main/character-girl.png'),
+  MALE: require('@/assets/images/onboarding/character-male.png'),
+} as const;
+
+const PROFILE_SOURCE = {
+  FEMALE: require('@/assets/images/main/profile-girl.png'),
+  MALE: require('@/assets/images/onboarding/character-male.png'),
+} as const;
+
 export default function MainScreen() {
   const router = useRouter();
+  const { profile, shouldShowGuide, setShouldShowGuide } = useUserProfile();
+  const gender = profile.gender ?? 'FEMALE';
+  const [guideVisible, setGuideVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
+
+  useEffect(() => {
+    if (shouldShowGuide) {
+      setGuideVisible(true);
+      setShouldShowGuide(false);
+    }
+  }, [shouldShowGuide, setShouldShowGuide]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -31,7 +58,10 @@ export default function MainScreen() {
   ).current;
 
   function handleDiary() {
-    // TODO: wire up to the record (여행 기록) flow once that screen exists.
+    // NOTE: 이 세션에서는 아직 로컬 router.d.ts(typed routes)에 신규 record 라우트가 반영되지 않아
+    // `as Href`로 캐스팅해둠. expo start/run:android를 한 번 실행하면 자동으로 타입이 갱신되면서
+    // 캐스팅 없이도 타입 체크가 통과한다 (런타임 동작에는 영향 없음).
+    router.push('/(main)/record' as Href);
   }
 
   function handleFrame() {
@@ -43,11 +73,12 @@ export default function MainScreen() {
   }
 
   function handleSettings() {
-    // TODO: wire up to the settings flow once that screen exists.
+    // NOTE: 신규 settings 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅 (handleDiary와 동일 사유).
+    router.push('/(main)/settings' as Href);
   }
 
   function handleProfile() {
-    // TODO: wire up to the profile flow once that screen exists.
+    setProfileVisible(true);
   }
 
   function handleRefreshRegionName() {
@@ -71,9 +102,10 @@ export default function MainScreen() {
             <CoinBadge amount={797} />
             <Pressable onPress={handleProfile} hitSlop={8} style={styles.profileButton}>
               <Image
-                source={require('@/assets/images/main/profile-girl.png')}
+                source={PROFILE_SOURCE[gender]}
                 style={styles.profileImage}
                 contentFit="cover"
+                contentPosition="top"
               />
             </Pressable>
           </View>
@@ -115,9 +147,10 @@ export default function MainScreen() {
           contentFit="contain"
         />
         <Image
-          source={require('@/assets/images/main/character-girl.png')}
+          source={CHARACTER_SOURCE[gender]}
           style={styles.character}
           contentFit="contain"
+          contentPosition="bottom"
         />
       </View>
 
@@ -132,6 +165,9 @@ export default function MainScreen() {
           <RefreshIcon width={20} height={20} />
         </Pressable>
       </View>
+
+      <OnboardingGuide visible={guideVisible} onFinish={() => setGuideVisible(false)} />
+      <ProfileOverlay visible={profileVisible} onClose={() => setProfileVisible(false)} />
     </View>
   );
 }
