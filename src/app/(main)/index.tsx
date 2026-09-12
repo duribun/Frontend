@@ -65,7 +65,7 @@ export default function MainScreen() {
   }
 
   function handleFrame() {
-    // TODO: wire up to the collection (수집) flow once that screen exists.
+    router.push('/(main)/collection');
   }
 
   function handleShop() {
