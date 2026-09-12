@@ -8,6 +8,7 @@ export default function MainLayout() {
       <Stack.Screen name="collection" />
       <Stack.Screen name="collection-mascot" />
       <Stack.Screen name="collection-stamp" />
+      <Stack.Screen name="shop" />
       <Stack.Screen name="record/index" />
       <Stack.Screen name="record/write" />
       <Stack.Screen name="record/[id]" />
