@@ -65,11 +65,13 @@ export default function MainScreen() {
   }
 
   function handleFrame() {
-    router.push('/(main)/collection');
+    // NOTE: 신규 collection 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅 (handleDiary와 동일 사유).
+    router.push('/(main)/collection' as Href);
   }
 
   function handleShop() {
-    router.push('/(main)/shop');
+    // NOTE: 신규 shop 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅 (handleDiary와 동일 사유).
+    router.push('/(main)/shop' as Href);
   }
 
   function handleSettings() {

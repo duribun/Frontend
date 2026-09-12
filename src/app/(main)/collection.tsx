@@ -1,6 +1,6 @@
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import FlowerDeco from '@/assets/icons/collection/preview-mascot-flower.svg';
@@ -15,7 +15,11 @@ export default function CollectionScreen() {
   return (
     <CollectionBoard title="수집">
       <View style={styles.cardColumn}>
-        <Pressable style={styles.card} onPress={() => router.push('/(main)/collection-mascot')}>
+        <Pressable
+          style={styles.card}
+          // NOTE: 신규 collection-mascot 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅.
+          onPress={() => router.push('/(main)/collection-mascot' as Href)}
+        >
           <Text style={[styles.cardTitle, fontsLoaded && styles.cardTitleFont]}>마스코트</Text>
           <View style={styles.cardPreview}>
             <Image
@@ -27,7 +31,11 @@ export default function CollectionScreen() {
           </View>
         </Pressable>
 
-        <Pressable style={styles.card} onPress={() => router.push('/(main)/collection-stamp')}>
+        <Pressable
+          style={styles.card}
+          // NOTE: 신규 collection-stamp 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅.
+          onPress={() => router.push('/(main)/collection-stamp' as Href)}
+        >
           <Text style={[styles.cardTitle, fontsLoaded && styles.cardTitleFont]}>도장판</Text>
           <View style={styles.cardPreview}>
             <Image
