@@ -7,10 +7,16 @@ import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, wi
 
 import { AuthBackground } from '@/components/auth/auth-background';
 import { SocialRow, type SocialProvider } from '@/components/auth/social-row';
-import { signInWithGoogle } from '@/lib/auth';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, type SocialLoginResult } from '@/lib/auth';
 
 // TODO: 자동로그인(토큰 재발급) 체크가 붙으면 이 타이머 대신 그 결과로 ready를 바꾼다.
 const LOADING_DURATION_MS = 2200;
+
+const SOCIAL_SIGN_IN: Record<SocialProvider, () => Promise<SocialLoginResult>> = {
+  google: signInWithGoogle,
+  kakao: signInWithKakao,
+  naver: signInWithNaver,
+};
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -28,20 +34,13 @@ export default function SplashScreen() {
   }));
 
   async function handleSocialSignIn(provider: SocialProvider) {
-    // TODO: Kakao/Naver는 아직 미구현 — Google 먼저 붙이고 후속 작업으로 추가한다.
-    if (provider !== 'google') {
-      console.log(`[auth] TEMP bypass login as ${provider}`);
-      router.replace('/(onboarding)/profile-setup');
-      return;
-    }
-
     try {
-      const { isNewUser } = await signInWithGoogle();
+      const { isNewUser } = await SOCIAL_SIGN_IN[provider]();
       // 최초 가입이면 프로필 설정으로, 재로그인이면 위치 권한 여부와 무관하게 바로 메인으로.
       router.replace(isNewUser ? '/(onboarding)/profile-setup' : '/(main)');
     } catch (error) {
       // TODO: 에러 토스트/알림 UI. 지금은 콘솔 로그만 남기고 스플래시에 그대로 머문다.
-      console.error('[auth] Google 로그인 실패', error);
+      console.error(`[auth] ${provider} 로그인 실패`, error);
     }
   }
 

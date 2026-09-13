@@ -1,9 +1,11 @@
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { login as kakaoLogin } from '@react-native-seoul/kakao-login';
+import NaverLogin from '@react-native-seoul/naver-login';
 
 import { resolveApiBaseUrl } from '@/lib/api-config';
 import { saveTokens } from '@/lib/token-storage';
 
-// Phase 1: 소셜 로그인. Google부터 먼저 구현하고 Kakao/Naver는 후속 작업으로 추가한다.
+// Phase 1: 소셜 로그인 (Google/Kakao/Naver).
 //
 // BE 실제 코드(AuthController/LoginRequest/LoginResponse) 확인 완료 — 아래 스키마는 가정이 아니라 검증된 값이다.
 //   - 요청 바디: { token: string }
@@ -57,4 +59,36 @@ export async function signInWithGoogle(): Promise<SocialLoginResult> {
   }
 
   return socialLogin('GOOGLE', idToken);
+}
+
+export async function signInWithKakao(): Promise<SocialLoginResult> {
+  // KakaoAuthClient(BE)는 Access Token으로 카카오 REST API를 호출해 사용자 정보를 조회하는 방식이라,
+  // Google과 달리 idToken이 아니라 accessToken을 보낸다.
+  const token = await kakaoLogin();
+  return socialLogin('KAKAO', token.accessToken);
+}
+
+let naverInitialized = false;
+
+function ensureNaverInitialized() {
+  if (naverInitialized) return;
+  NaverLogin.initialize({
+    appName: '두리번',
+    consumerKey: process.env.EXPO_PUBLIC_NAVER_CLIENT_ID ?? '',
+    consumerSecret: process.env.EXPO_PUBLIC_NAVER_CLIENT_SECRET ?? '',
+    // app.json의 "scheme"("fe")과 반드시 동일해야 로그인 후 앱으로 정상 복귀한다.
+    serviceUrlSchemeIOS: 'fe',
+    disableNaverAppAuthIOS: true,
+  });
+  naverInitialized = true;
+}
+
+export async function signInWithNaver(): Promise<SocialLoginResult> {
+  // NaverAuthClient(BE)도 Kakao와 동일하게 Access Token 기반 REST 검증 방식.
+  ensureNaverInitialized();
+  const { isSuccess, successResponse, failureResponse } = await NaverLogin.login();
+  if (!isSuccess || !successResponse) {
+    throw new Error(failureResponse?.message ?? 'Naver 로그인에 실패했습니다.');
+  }
+  return socialLogin('NAVER', successResponse.accessToken);
 }
