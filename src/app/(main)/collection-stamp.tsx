@@ -8,6 +8,7 @@ import { CollectionBoard } from '@/components/collection/collection-board';
 type Tier = {
   id: string;
   label: [string, string];
+  threshold: number;
   leftPct: number;
   topPct: number;
   decorative: boolean;
@@ -16,21 +17,23 @@ type Tier = {
 
 // Positions below are read off the Figma board (390x797) as percentages of the board
 // rect, since the tier ladder skips rows non-uniformly (milestones get sparser at
-// higher tiers). TODO: replace with real thresholds once the character/collection
-// API defines them — for now this mirrors the Figma mock 1:1.
+// higher tiers) — this mirrors the Figma mock 1:1.
 // "레전드 여행가" used to live on a separate completion-state board (Figma node
 // 616:1164) — the design merged it into this board as a 9th tier, which pulled
-// veteran/national/master up to make room.
+// veteran/national/master up to make room. "베테랑 여행자" was later dropped
+// (issue #27), so national/master/legend each shift up by one slot (~6.66%)
+// to close the gap it left.
+// threshold = 칭호 획득에 필요한 마스코트 수 (기획 확정값). 화면에는 표시하지 않고
+// reached 판정 로직(보유 마스코트 수와 비교)에만 사용 — TODO: 실제 보유 수와 연동.
 const TIERS: Tier[] = [
-  { id: 'seed', label: ['여행', '새싹'], leftPct: 20.72, topPct: 18.95, decorative: false, reached: true },
-  { id: 'beginner', label: ['여행', '입문자'], leftPct: 79.4, topPct: 18.82, decorative: false, reached: false },
-  { id: 'novice', label: ['초보', '여행가'], leftPct: 79.55, topPct: 25.61, decorative: true, reached: false },
-  { id: 'regional', label: ['지역', '수집가'], leftPct: 79.55, topPct: 32.27, decorative: true, reached: false },
-  { id: 'pioneer', label: ['여행', '개척자'], leftPct: 79.55, topPct: 38.92, decorative: true, reached: false },
-  { id: 'veteran', label: ['베테랑', '여행자'], leftPct: 79.55, topPct: 45.71, decorative: true, reached: false },
-  { id: 'national', label: ['전국', '여행가'], leftPct: 79.55, topPct: 52.37, decorative: true, reached: false },
-  { id: 'master', label: ['마스터', '여행가'], leftPct: 79.55, topPct: 65.81, decorative: true, reached: false },
-  { id: 'legend', label: ['레전드', '여행가'], leftPct: 79.55, topPct: 78.75, decorative: true, reached: false },
+  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 20.72, topPct: 18.95, decorative: false, reached: true },
+  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 79.4, topPct: 18.82, decorative: false, reached: false },
+  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 79.55, topPct: 25.61, decorative: true, reached: false },
+  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 79.55, topPct: 32.27, decorative: true, reached: false },
+  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 79.55, topPct: 38.92, decorative: true, reached: false },
+  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 79.55, topPct: 45.71, decorative: true, reached: false },
+  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 79.55, topPct: 59.15, decorative: true, reached: false },
+  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 79.55, topPct: 72.09, decorative: true, reached: false },
 ];
 
 // Centers deliberately coincide with the "seed"/"beginner" tier labels above — an
