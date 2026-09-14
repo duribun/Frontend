@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthBackground } from '@/components/auth/auth-background';
 import { PillButton } from '@/components/auth/pill-button';
 import { useUserProfile, type Gender } from '@/context/user-profile-context';
-import { checkNicknameAvailable, saveProfile } from '@/lib/api';
+import { ApiError, checkNicknameAvailable, saveProfile } from '@/lib/api';
 
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9]{2,10}$/;
 
@@ -18,11 +18,13 @@ export default function ProfileSetupScreen() {
   const [nickname, setNickname] = useState('');
   const [nicknameChecked, setNicknameChecked] = useState(false);
   const [checkingNickname, setCheckingNickname] = useState(false);
+  const [nicknameError, setNicknameError] = useState<string | null>(null);
   const [year, setYear] = useState('');
   const [month, setMonth] = useState('');
   const [day, setDay] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const nicknameValid = NICKNAME_REGEX.test(nickname);
   const birthdateValid = year.length === 4 && month.length >= 1 && day.length >= 1;
@@ -31,23 +33,25 @@ export default function ProfileSetupScreen() {
   function handleChangeNickname(text: string) {
     setNickname(text);
     setNicknameChecked(false);
+    setNicknameError(null);
   }
 
   async function handleCheckNickname() {
     if (!nicknameValid || checkingNickname) return;
     setCheckingNickname(true);
+    setNicknameError(null);
     try {
       const result = await checkNicknameAvailable(nickname);
       setNicknameChecked(result.available);
       if (!result.available) {
-        // TODO: 중복된 닉네임 안내 UI (토스트/에러 텍스트) 추가.
-        console.warn('[profile-setup] nickname already in use:', nickname);
+        setNicknameError('이미 사용 중인 닉네임이에요.');
       }
     } catch (error) {
-      // TEMP: 로그인 연동 전이라 인증 토큰이 없어 API가 401로 실패할 수 있다.
-      // 개발 흐름이 막히지 않도록 우선 통과 처리하고, 실제 인증이 붙으면 이 catch가 자연히 사라진다.
-      console.warn('[profile-setup] nickname-check API 호출 실패, 임시로 통과 처리:', error);
-      setNicknameChecked(true);
+      // 로그인(Phase 1) 연동 완료 후에는 401이 아니라 400(형식 위반)/네트워크 오류만 실제로 발생해야 한다.
+      // 예전처럼 실패를 통과 처리하면 잘못된 닉네임도 넘어가버리니, 확인 실패로 명확히 남긴다.
+      setNicknameChecked(false);
+      setNicknameError('닉네임 확인에 실패했어요. 다시 시도해주세요.');
+      console.error('[profile-setup] nickname-check 실패', error);
     } finally {
       setCheckingNickname(false);
     }
@@ -56,15 +60,23 @@ export default function ProfileSetupScreen() {
   async function handleNext() {
     if (!canSubmit || !gender) return;
     setSubmitting(true);
+    setSubmitError(null);
     const birthDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     try {
       await saveProfile({ nickname, birthDate, gender });
     } catch (error) {
-      // TEMP: 위와 동일한 이유(인증 토큰 없음)로 실패할 수 있어 흐름은 계속 진행시킨다.
-      console.warn('[profile-setup] profile 저장 API 호출 실패, 로컬 상태만 반영:', error);
-    } finally {
+      // 409 = 저장 시점에 닉네임이 이미 다른 사람에게 선점됨(중복확인 이후 레이스 컨디션) — 재확인 요구.
+      if (error instanceof ApiError && error.status === 409) {
+        setNicknameChecked(false);
+        setSubmitError('방금 다른 사람이 선점한 닉네임이에요. 닉네임을 다시 확인해주세요.');
+      } else {
+        setSubmitError('프로필 저장에 실패했어요. 잠시 후 다시 시도해주세요.');
+      }
+      console.error('[profile-setup] profile 저장 실패', error);
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
     setProfile({ nickname, birthDate, gender });
     router.push('/(onboarding)/location-permission');
   }
@@ -94,6 +106,7 @@ export default function ProfileSetupScreen() {
             </Text>
           </Pressable>
         </View>
+        {nicknameError && <Text style={styles.errorText}>{nicknameError}</Text>}
 
         <Text style={styles.sectionLabel}>생년월일</Text>
         <View style={styles.birthRow}>
@@ -144,7 +157,8 @@ export default function ProfileSetupScreen() {
 
         <View style={styles.spacer} />
 
-        <PillButton label="다음" onPress={handleNext} disabled={!canSubmit} />
+        {submitError && <Text style={styles.errorText}>{submitError}</Text>}
+        <PillButton label={submitting ? '저장 중...' : '다음'} onPress={handleNext} disabled={!canSubmit} />
       </SafeAreaView>
     </AuthBackground>
   );
@@ -225,6 +239,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.8)',
+  },
+  errorText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF8A8A',
   },
   checkButtonLabelActive: {
     color: '#4B7F3F',
