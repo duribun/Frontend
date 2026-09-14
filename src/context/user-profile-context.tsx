@@ -22,9 +22,9 @@ const EMPTY_PROFILE: UserProfile = { nickname: null, birthDate: null, gender: nu
 
 const UserProfileContext = createContext<UserProfileContextValue | null>(null);
 
-// NOTE: 현재는 메모리에만 저장한다 (AsyncStorage 등 영구 저장소 미도입).
-// BE에 프로필 조회(GET) API가 아직 없어서, 로그인 세션이 유지되는 동안에만 값이 남아있는다.
-// 재설치/재실행 시에는 다시 profile-setup을 거치거나, BE 조회 API가 생기면 그걸로 교체한다.
+// NOTE: 이 값 자체는 메모리에만 저장된다 (AsyncStorage 등 영구 저장소 미도입) — 하지만 항상 최신은
+// (main)/_layout.tsx가 앱 진입/재로그인마다 GET /api/users/me로 다시 채워준다(재설치/재시작 시에도 동일).
+// 여기 프로바이더는 그 값을 들고 있는 저장소 역할만 하고, 실제 조회는 (main)/_layout.tsx가 담당한다.
 export function UserProfileProvider({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
   const [shouldShowGuide, setShouldShowGuide] = useState(false);

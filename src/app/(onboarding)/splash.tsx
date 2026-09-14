@@ -7,9 +7,16 @@ import Animated, { Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, wi
 
 import { AuthBackground } from '@/components/auth/auth-background';
 import { SocialRow, type SocialProvider } from '@/components/auth/social-row';
+import { signInWithGoogle, signInWithKakao, signInWithNaver, type SocialLoginResult } from '@/lib/auth';
 
 // TODO: 자동로그인(토큰 재발급) 체크가 붙으면 이 타이머 대신 그 결과로 ready를 바꾼다.
 const LOADING_DURATION_MS = 2200;
+
+const SOCIAL_SIGN_IN: Record<SocialProvider, () => Promise<SocialLoginResult>> = {
+  google: signInWithGoogle,
+  kakao: signInWithKakao,
+  naver: signInWithNaver,
+};
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -26,12 +33,15 @@ export default function SplashScreen() {
     width: `${progress.value * 100}%`,
   }));
 
-  function handleSocialSignIn(provider: SocialProvider) {
-    // TEMP: BE 소셜 로그인 연동 전까지는 버튼 클릭 시 바로 다음 온보딩 단계로 이동한다.
-    // TODO: BE 연동되면 이 부분을 실제 provider OAuth → socialLogin(provider, token) 호출로 교체.
-    // TODO: 최초 로그인이 아닌 경우(재로그인) profile-setup을 건너뛰고 (main)으로 바로 보내는 분기 추가.
-    console.log(`[auth] TEMP bypass login as ${provider}`);
-    router.replace('/(onboarding)/profile-setup');
+  async function handleSocialSignIn(provider: SocialProvider) {
+    try {
+      const { isNewUser } = await SOCIAL_SIGN_IN[provider]();
+      // 최초 가입이면 프로필 설정으로, 재로그인이면 위치 권한 여부와 무관하게 바로 메인으로.
+      router.replace(isNewUser ? '/(onboarding)/profile-setup' : '/(main)');
+    } catch (error) {
+      // TODO: 에러 토스트/알림 UI. 지금은 콘솔 로그만 남기고 스플래시에 그대로 머문다.
+      console.error(`[auth] ${provider} 로그인 실패`, error);
+    }
   }
 
   return (

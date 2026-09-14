@@ -1,6 +1,6 @@
 import type { Gender } from '@/context/user-profile-context';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+import { resolveApiBaseUrl } from '@/lib/api-config';
+import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from '@/lib/token-storage';
 
 class ApiError extends Error {
   status: number;
@@ -10,20 +10,63 @@ class ApiError extends Error {
   }
 }
 
-// TODO: 실제 로그인/토큰 연동 전까지는 인증 토큰이 없다.
-// splash.tsx가 아직 TEMP 바이패스라 access token을 어디서도 발급받지 않는 상태.
-// 토큰 저장소가 생기면 여기서 Authorization 헤더를 채워 넣는다.
-function getAccessToken(): string | null {
-  return null;
-}
+type ReissueResponse = {
+  accessToken: string;
+  refreshToken: string;
+};
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!API_BASE_URL) {
-    throw new Error('EXPO_PUBLIC_API_BASE_URL이 설정되지 않았습니다.');
+// 여러 요청이 동시에 401을 받아도 /api/auth/reissue는 한 번만 호출되도록 in-flight promise를 공유한다
+// (single-flight). 재발급이 끝나기 전에 또 401이 오면 이 promise에 합류시킨다.
+let reissueInFlight: Promise<string | null> | null = null;
+
+async function reissueAccessToken(): Promise<string | null> {
+  if (reissueInFlight) {
+    return reissueInFlight;
   }
 
-  const token = getAccessToken();
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  reissueInFlight = (async () => {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(`${resolveApiBaseUrl()}/api/auth/reissue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        // 리프레시 토큰도 만료/무효 — 세션 완전 종료. 로그인 화면으로의 리다이렉트는
+        // Phase 1(실제 로그인 연동)에서 이 상태를 감지해 처리한다.
+        await clearTokens();
+        return null;
+      }
+
+      const data = (await response.json()) as ReissueResponse;
+      await saveTokens(data.accessToken, data.refreshToken);
+      return data.accessToken;
+    } catch {
+      return null;
+    }
+  })();
+
+  try {
+    return await reissueInFlight;
+  } finally {
+    reissueInFlight = null;
+  }
+}
+
+// 재발급 자체를 시도할 필요가 없는 경로 — 재귀 호출로 인한 무한 루프 방지.
+const AUTH_ENDPOINTS_WITHOUT_RETRY = ['/api/auth/login', '/api/auth/reissue', '/api/auth/logout'];
+
+async function request<T>(path: string, init?: RequestInit, isRetryAfterReissue = false): Promise<T> {
+  const baseUrl = resolveApiBaseUrl();
+  const token = await getAccessToken();
+
+  const response = await fetch(`${baseUrl}${path}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',
@@ -31,6 +74,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
+
+  const canRetry = !isRetryAfterReissue && !AUTH_ENDPOINTS_WITHOUT_RETRY.some((p) => path.startsWith(p));
+  if (response.status === 401 && canRetry) {
+    const newAccessToken = await reissueAccessToken();
+    if (newAccessToken) {
+      return request<T>(path, init, true);
+    }
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, `${init?.method ?? 'GET'} ${path} failed: ${response.status}`);
@@ -313,14 +364,33 @@ export function verifyLocation(payload: VerifyLocationRequest): Promise<VerifyLo
 
 // ---- 설정 화면 ----
 
-// NOTE: 소셜 로그인이 아직 TEMP 바이패스라 리프레시 토큰을 들고 있지 않다 (getAccessToken()도 항상 null).
-// 실제 로그인 연동 전까지는 이 호출이 성공하더라도 의미 있는 세션 종료는 아니다 (docs/API-NEEDS-설정.md 3번 참고).
-export function logout(): Promise<void> {
-  return request<void>('/api/auth/logout', { method: 'POST' });
+// NOTE: 소셜 로그인이 아직 TEMP 바이패스라 SecureStore에 리프레시 토큰이 저장돼 있지 않다.
+// 실제 로그인 연동(Phase 1) 전까지는 refreshToken이 null이라 BE 호출이 의미 있는 세션 종료는 아니지만,
+// 로컬 토큰 clear는 지금부터 항상 수행해 Phase 1 연동 후 바로 정상 동작하도록 해둔다.
+export async function logout(): Promise<void> {
+  const refreshToken = await getRefreshToken();
+  try {
+    await request<void>('/api/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken }),
+    });
+  } finally {
+    await clearTokens();
+  }
 }
 
 export function withdrawAccount(): Promise<void> {
   return request<void>('/api/settings/me/withdraw', { method: 'DELETE' });
+}
+
+// ---- point (포인트) ----
+
+export type PointBalance = {
+  balance: number;
+};
+
+export function getMyPointBalance(): Promise<PointBalance> {
+  return request<PointBalance>('/api/points/me');
 }
 
 export { ApiError };
