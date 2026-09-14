@@ -141,16 +141,24 @@ export default function ProfileSetupScreen() {
 
         <Text style={styles.sectionLabel}>성별</Text>
         <View style={styles.genderRow}>
+          {/* key에 selected 값을 넣어서, 성별을 전환할 때마다 이 카드가 완전히 언마운트→새로
+              마운트되게 강제한다. recyclingKey만으로는 안드로이드에서 이미지가 계속 사라지는
+              문제가 해결되지 않아(재현 확인됨), props만 바뀌는 게 아니라 네이티브 Image 뷰 자체를
+              새로 만들어서 안드로이드 쪽의 오래된 비트맵/레이아웃 캐시 문제를 원천적으로 피한다. */}
           <CharacterCard
+            key={`female-${gender === 'FEMALE'}`}
             label="여자"
             selected={gender === 'FEMALE'}
             source={require('@/assets/images/onboarding/character-female.png')}
+            recyclingKey="character-female"
             onPress={() => setGender('FEMALE')}
           />
           <CharacterCard
+            key={`male-${gender === 'MALE'}`}
             label="남자"
             selected={gender === 'MALE'}
             source={require('@/assets/images/onboarding/character-male.png')}
+            recyclingKey="character-male"
             onPress={() => setGender('MALE')}
           />
         </View>
@@ -168,11 +176,13 @@ function CharacterCard({
   label,
   selected,
   source,
+  recyclingKey,
   onPress,
 }: {
   label: string;
   selected: boolean;
   source: ComponentProps<typeof Image>['source'];
+  recyclingKey: string;
   onPress: () => void;
 }) {
   return (
@@ -182,7 +192,11 @@ function CharacterCard({
       accessibilityState={{ selected }}
       accessibilityLabel={label}
       style={[styles.characterCard, selected && styles.characterCardSelected]}>
-      <Image source={source} style={styles.characterImage} contentFit="contain" />
+      {/* recyclingKey: 안드로이드에서 expo-image가 뷰를 재사용(recycle)하는 과정에서
+          두 카드의 로컬 캐릭터 이미지가 뒤섞여, 성별을 전환하면 방금 선택 해제된 카드의
+          이미지가 빈 화면으로 보이던 버그(ISSUE-성별캐릭터-프로필이미지버그.md 1번)의 수정.
+          각 소스마다 고유한 키를 줘서 재사용 시 캐시가 섞이지 않도록 한다. */}
+      <Image source={source} style={styles.characterImage} contentFit="contain" recyclingKey={recyclingKey} />
       {selected && (
         <View style={styles.checkBadge}>
           <Ionicons name="checkmark" size={12} color="#FFFFFF" />
@@ -282,9 +296,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251,255,251,0.92)',
     overflow: 'hidden',
     padding: 10,
+    // 선택 시에만 borderWidth가 0→3으로 붙으면 카드 크기가 바뀌면서 리레이아웃이 발생해,
+    // 이게 안드로이드에서 이미지가 사라지는 문제의 원인 중 하나로 보인다. 항상 3px 테두리를
+    // 깔아두고(투명) 선택 시엔 색만 바꿔서, 선택 상태가 바뀌어도 카드 크기 자체는 고정되게 한다.
+    borderWidth: 3,
+    borderColor: 'transparent',
   },
   characterCardSelected: {
-    borderWidth: 3,
     borderColor: '#4A7CD6',
   },
   characterImage: {
