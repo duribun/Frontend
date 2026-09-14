@@ -1,16 +1,17 @@
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type AttractionCardProps = {
   title: string;
-  description: string;
-  location: string;
-  imageUrl?: string;
+  description?: string | null;
+  location?: string | null;
+  imageUrl?: string | null;
+  onPress?: () => void;
 };
 
-export function AttractionCard({ title, description, location, imageUrl }: AttractionCardProps) {
+export function AttractionCard({ title, description, location, imageUrl, onPress }: AttractionCardProps) {
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={onPress} disabled={!onPress}>
       <View style={styles.thumbnail}>
         {imageUrl ? <Image source={{ uri: imageUrl }} style={styles.thumbnailImage} contentFit="cover" /> : null}
       </View>
@@ -18,12 +19,14 @@ export function AttractionCard({ title, description, location, imageUrl }: Attra
         <Text style={styles.title} numberOfLines={2}>
           {title}
         </Text>
-        <Text style={styles.description} numberOfLines={2}>
-          {description}
-        </Text>
-        <Text style={styles.location}>{location}</Text>
+        {description ? (
+          <Text style={styles.description} numberOfLines={2}>
+            {description}
+          </Text>
+        ) : null}
+        {location ? <Text style={styles.location}>{location}</Text> : null}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
