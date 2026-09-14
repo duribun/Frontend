@@ -383,4 +383,14 @@ export function withdrawAccount(): Promise<void> {
   return request<void>('/api/settings/me/withdraw', { method: 'DELETE' });
 }
 
+// ---- point (포인트) ----
+
+export type PointBalance = {
+  balance: number;
+};
+
+export function getMyPointBalance(): Promise<PointBalance> {
+  return request<PointBalance>('/api/points/me');
+}
+
 export { ApiError };

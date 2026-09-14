@@ -1,7 +1,7 @@
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
-import { useRouter, type Href } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,6 +12,7 @@ import { IconButton } from '@/components/main/icon-button';
 import { OnboardingGuide } from '@/components/onboarding/onboarding-guide';
 import { ProfileOverlay } from '@/components/profile/profile-overlay';
 import { useUserProfile } from '@/context/user-profile-context';
+import { getMyPointBalance } from '@/lib/api';
 
 const SWIPE_THRESHOLD = 60;
 
@@ -34,6 +35,7 @@ export default function MainScreen() {
   const gender = profile.gender ?? 'FEMALE';
   const [guideVisible, setGuideVisible] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
+  const [coins, setCoins] = useState(0);
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
@@ -44,6 +46,25 @@ export default function MainScreen() {
       setShouldShowGuide(false);
     }
   }, [shouldShowGuide, setShouldShowGuide]);
+
+  // 화면에 포커스될 때마다 잔액을 다시 불러온다 — 샵에서 구매하거나 마스코트/칭호 획득으로
+  // 포인트가 바뀐 뒤 메인 화면으로 돌아와도(스택 push라 재마운트되지 않음) 최신 값을 보여주기 위함.
+  // 실패 시에는 장식성 배지라 에러 UI 없이 조용히 이전 값을 유지한다.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      getMyPointBalance()
+        .then((result) => {
+          if (!cancelled) setCoins(result.balance);
+        })
+        .catch(() => {
+          // no-op: 조회 실패해도 화면을 막지 않고 이전 값을 유지한다.
+        });
+      return () => {
+        cancelled = true;
+      };
+    }, []),
+  );
 
   const panResponder = useRef(
     PanResponder.create({
@@ -101,7 +122,7 @@ export default function MainScreen() {
           </Pressable>
 
           <View style={styles.headerRight}>
-            <CoinBadge amount={797} />
+            <CoinBadge amount={coins} />
             <Pressable onPress={handleProfile} hitSlop={8} style={styles.profileButton}>
               <Image
                 source={PROFILE_SOURCE[gender]}
