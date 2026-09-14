@@ -1,5 +1,5 @@
-import { useRouter, type Href } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,32 +25,38 @@ export default function RecordHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setErrorMessage(null);
+  // expo-router의 Stack은 push/pop이라 record/write에서 저장 후 record/[id]로 replace되고,
+  // 거기서 뒤로가기하면 이 화면은 "재마운트"가 아니라 "포커스 복귀"로 돌아온다. plain useEffect([year, month])는
+  // 이 시점에 다시 실행되지 않아 방금 작성/수정한 기록이 목록에 반영되지 않는 문제가 있었다 —
+  // 화면이 포커스를 받을 때마다(연/월 변경 포함) 다시 불러오도록 useFocusEffect로 바꾼다.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      setErrorMessage(null);
 
-    listRecords(year, month)
-      .then((result) => {
-        if (!cancelled) setRecords(result);
-      })
-      .catch((error: unknown) => {
-        if (cancelled) return;
-        setRecords([]);
-        setErrorMessage(
-          error instanceof ApiError
-            ? `기록을 불러오지 못했어요. (${error.status})`
-            : '기록을 불러오지 못했어요.',
-        );
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      listRecords(year, month)
+        .then((result) => {
+          if (!cancelled) setRecords(result);
+        })
+        .catch((error: unknown) => {
+          if (cancelled) return;
+          setRecords([]);
+          setErrorMessage(
+            error instanceof ApiError
+              ? `기록을 불러오지 못했어요. (${error.status})`
+              : '기록을 불러오지 못했어요.',
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [year, month]);
+      return () => {
+        cancelled = true;
+      };
+    }, [year, month]),
+  );
 
   const markedDateKeys = useMemo(() => {
     const keys = new Set<string>();
