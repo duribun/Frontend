@@ -1,30 +1,52 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { CollectionBoard } from '@/components/collection/collection-board';
 import { MascotSticker } from '@/components/collection/mascot-sticker';
+import { getMascots, type MascotEntry } from '@/lib/api';
 
-// TODO: wire up to the backend character/collection API once it exists — mock mascots below.
-const MASCOTS = [
-  { id: 'bread', image: require('@/assets/images/collection/mascot-bread-char.png') },
-  { id: 'camellia', image: require('@/assets/images/collection/mascot-camellia-char.png') },
-  { id: 'apple', image: require('@/assets/images/collection/mascot-apple-char.png') },
-  { id: 'crane', image: require('@/assets/images/collection/mascot-crane-char.png') },
-  { id: 'azalea', image: require('@/assets/images/collection/mascot-azalea-char.png') },
-  { id: 'haechi', image: require('@/assets/images/collection/mascot-haechi-char.png') },
-  { id: 'sealion', image: require('@/assets/images/collection/mascot-sealion-char.png') },
-  { id: 'catcrab', image: require('@/assets/images/collection/mascot-catcrab-char.png') },
-  { id: 'whale', image: require('@/assets/images/collection/mascot-whale-char.png') },
-  { id: 'deer', image: require('@/assets/images/collection/mascot-deer-char.png') },
-];
+const PAGE_SIZE = 6;
 
-const TOTAL_MASCOT_COUNT = 76;
-const PAGES = [MASCOTS.slice(0, 6), MASCOTS.slice(6)];
+function chunk<T>(items: T[], size: number): T[][] {
+  const pages: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    pages.push(items.slice(i, i + size));
+  }
+  return pages.length > 0 ? pages : [[]];
+}
 
 export default function CollectionMascotScreen() {
+  const [mascots, setMascots] = useState<MascotEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [pageWidth, setPageWidth] = useState(0);
   const [activePage, setActivePage] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const results = await getMascots();
+        if (!cancelled) {
+          setMascots(results);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('마스코트 도감을 불러오지 못했어요.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function handleLayout(event: LayoutChangeEvent) {
     setPageWidth(event.nativeEvent.layout.width);
@@ -35,32 +57,50 @@ export default function CollectionMascotScreen() {
     setActivePage(Math.round(event.nativeEvent.contentOffset.x / pageWidth));
   }
 
-  return (
-    <CollectionBoard title="마스코트 도감" subtitle={`${MASCOTS.length} / ${TOTAL_MASCOT_COUNT}`}>
-      <View style={styles.scrollWrap} onLayout={handleLayout}>
-        {pageWidth > 0 && (
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleScrollEnd}
-          >
-            {PAGES.map((pageMascots, index) => (
-              <View key={index} style={[styles.page, { width: pageWidth }]}>
-                {pageMascots.map((mascot) => (
-                  <MascotSticker key={mascot.id} image={mascot.image} />
-                ))}
-              </View>
-            ))}
-          </ScrollView>
-        )}
-      </View>
+  const acquiredCount = mascots.filter((mascot) => mascot.acquired).length;
+  const pages = chunk(mascots, PAGE_SIZE);
 
-      <View style={styles.dots}>
-        {PAGES.map((_, index) => (
-          <View key={index} style={[styles.dot, activePage === index && styles.dotActive]} />
-        ))}
-      </View>
+  return (
+    <CollectionBoard title="마스코트 도감" subtitle={loading ? undefined : `${acquiredCount} / ${mascots.length}`}>
+      {loading ? (
+        <ActivityIndicator style={styles.statusIndicator} color="#6C4202" />
+      ) : error ? (
+        <Text style={styles.statusText}>{error}</Text>
+      ) : (
+        <>
+          <View style={styles.scrollWrap} onLayout={handleLayout}>
+            {pageWidth > 0 && (
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={handleScrollEnd}
+              >
+                {pages.map((pageMascots, index) => (
+                  <View key={index} style={[styles.page, { width: pageWidth }]}>
+                    {pageMascots.map((mascot) => (
+                      <MascotSticker
+                        key={mascot.mascotId}
+                        name={mascot.name}
+                        imageUrl={mascot.imageUrl}
+                        acquired={mascot.acquired}
+                      />
+                    ))}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+
+          {pages.length > 1 && (
+            <View style={styles.dots}>
+              {pages.map((_, index) => (
+                <View key={index} style={[styles.dot, activePage === index && styles.dotActive]} />
+              ))}
+            </View>
+          )}
+        </>
+      )}
     </CollectionBoard>
   );
 }
@@ -94,5 +134,14 @@ const styles = StyleSheet.create({
     width: 18,
     backgroundColor: '#4A2E05',
     opacity: 1,
+  },
+  statusIndicator: {
+    marginTop: 40,
+  },
+  statusText: {
+    marginTop: 40,
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#6C4202',
   },
 });

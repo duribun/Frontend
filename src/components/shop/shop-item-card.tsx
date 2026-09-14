@@ -5,17 +5,18 @@ export type ShopItemStatus = 'buy' | 'equip' | 'equipped' | 'listed';
 
 type ShopItemCardProps = {
   price: number;
-  image: number | null;
+  image: number | string | null;
   placeholderIcon?: React.ReactNode;
   status: ShopItemStatus;
   onPress: () => void;
 };
 
 export function ShopItemCard({ price, image, placeholderIcon, status, onPress }: ShopItemCardProps) {
+  const source = typeof image === 'string' ? { uri: image } : image;
   return (
     <Pressable style={styles.card} onPress={onPress} disabled={status === 'listed'}>
       <View style={styles.thumbnail}>
-        {image ? <Image source={image} style={styles.image} contentFit="contain" /> : placeholderIcon}
+        {source ? <Image source={source} style={styles.image} contentFit="contain" /> : placeholderIcon}
       </View>
 
       {status === 'buy' ? (

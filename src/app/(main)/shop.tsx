@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronLeftIcon from '@/assets/icons/map/chevron-left.svg';
@@ -15,16 +15,27 @@ import WallStripes from '@/assets/icons/shop/wall-stripes.svg';
 import { CoinBadge } from '@/components/main/coin-badge';
 import { ShopItemCard, type ShopItemStatus } from '@/components/shop/shop-item-card';
 import { ShopTabBar, type ShopTabKey } from '@/components/shop/shop-tab-bar';
+import {
+  ApiError,
+  getMyPointBalance,
+  getMyShopItems,
+  getShopItems,
+  purchaseItem,
+  toggleEquipItem,
+  type ItemCategory,
+  type MyShopItem,
+  type ShopItem as ApiShopItem,
+} from '@/lib/api';
 
 type ShopCategory = 'top' | 'bottom' | 'hat' | 'shoes' | 'accessory';
 
-type ShopItem = {
-  id: string;
-  category: ShopCategory;
-  name: string;
-  price: number;
-  image: number | null;
-  liked?: boolean;
+// 백엔드 ItemCategory(TOP/BOTTOM/HAT/SHOES/ACCESSORY)와 1:1 대응 (이슈 #8 / 백엔드 이슈 #64에서 정리 완료).
+const CATEGORY_TO_TAB: Record<ItemCategory, ShopCategory> = {
+  TOP: 'top',
+  BOTTOM: 'bottom',
+  HAT: 'hat',
+  SHOES: 'shoes',
+  ACCESSORY: 'accessory',
 };
 
 const CATEGORY_PLACEHOLDER_ICON: Record<ShopCategory, React.ComponentType<{ width?: number; height?: number }>> = {
@@ -35,102 +46,109 @@ const CATEGORY_PLACEHOLDER_ICON: Record<ShopCategory, React.ComponentType<{ widt
   accessory: AccessoryInactive,
 };
 
-// TODO: 백엔드 shop.category enum(GLASSES/BAG/CARRIER/HAT)이 이 Figma 카테고리
-// (top/bottom/hat/shoes/accessory)와 개념 자체가 달라 별도 이슈로 트래킹 중.
-// 카테고리 매핑이 정리되면 GET /api/shop/items, GET /api/shop/items/me로 교체.
-const MOCK_ITEMS: ShopItem[] = [
-  {
-    id: 'top-green',
-    category: 'top',
-    name: '그린 라운드넥 티셔츠',
-    price: 30,
-    image: require('@/assets/images/shop/item-top-green.png'),
-  },
-  {
-    id: 'top-shirt',
-    category: 'top',
-    name: '스트라이프 셔츠',
-    price: 40,
-    image: require('@/assets/images/shop/item-top-striped-shirt.png'),
-    liked: true,
-  },
-  {
-    id: 'top-hoodie',
-    category: 'top',
-    name: '옐로우 후드티',
-    price: 40,
-    image: require('@/assets/images/shop/item-top-yellow-hoodie.png'),
-  },
-  {
-    id: 'top-blue-fleece',
-    category: 'top',
-    name: '블루 후리스 자켓',
-    price: 70,
-    image: require('@/assets/images/shop/item-top-blue-fleece.png'),
-  },
-  {
-    id: 'top-green-fleece',
-    category: 'top',
-    name: '그린 조끼',
-    price: 70,
-    image: require('@/assets/images/shop/item-top-green-fleece.png'),
-    liked: true,
-  },
-  // 하의/모자/신발/악세서리는 Figma에서 실제 아이템 아트를 아직 못 뽑아서 카테고리 아이콘으로 대체.
-  { id: 'bottom-1', category: 'bottom', name: '데님 반바지', price: 30, image: null },
-  { id: 'bottom-2', category: 'bottom', name: '카고 팬츠', price: 50, image: null, liked: true },
-  { id: 'hat-1', category: 'hat', name: '버킷 햇', price: 35, image: null },
-  { id: 'hat-2', category: 'hat', name: '캡 모자', price: 45, image: null },
-  { id: 'shoes-1', category: 'shoes', name: '캔버스 스니커즈', price: 55, image: null },
-  { id: 'shoes-2', category: 'shoes', name: '샌들', price: 40, image: null, liked: true },
-  { id: 'accessory-1', category: 'accessory', name: '선글라스', price: 60, image: null },
-  { id: 'accessory-2', category: 'accessory', name: '크로스백', price: 65, image: null },
-];
+type Item = {
+  id: number;
+  tab: ShopCategory;
+  name: string;
+  price: number;
+  imageUrl: string | null;
+  owned: boolean;
+  equipped: boolean;
+};
 
-const STARTING_COINS = 1200;
+function mergeItems(catalog: ApiShopItem[], mine: MyShopItem[]): Item[] {
+  const mineById = new Map(mine.map((item) => [item.id, item]));
+  return catalog.map((item) => {
+    const owned = mineById.get(item.id);
+    return {
+      id: item.id,
+      tab: CATEGORY_TO_TAB[item.category],
+      name: item.name,
+      price: item.price,
+      imageUrl: item.imageUrl || null,
+      owned: owned != null,
+      equipped: owned?.isEquipped ?? false,
+    };
+  });
+}
 
 export default function ShopScreen() {
   const router = useRouter();
-  const [coins, setCoins] = useState(STARTING_COINS);
-  const [ownedIds, setOwnedIds] = useState<Set<string>>(() => new Set(['top-green']));
-  const [equippedByCategory, setEquippedByCategory] = useState<Partial<Record<ShopCategory, string>>>({
-    top: 'top-green',
-  });
+  const [coins, setCoins] = useState(0);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ShopTabKey>('top');
 
-  const visibleItems = useMemo(() => {
-    if (activeTab === 'liked') return MOCK_ITEMS.filter((item) => item.liked);
-    if (activeTab === 'owned') return MOCK_ITEMS.filter((item) => ownedIds.has(item.id));
-    return MOCK_ITEMS.filter((item) => item.category === activeTab);
-  }, [activeTab, ownedIds]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [catalog, mine, balance] = await Promise.all([getShopItems(), getMyShopItems(), getMyPointBalance()]);
+        if (!cancelled) {
+          setItems(mergeItems(catalog, mine));
+          setCoins(balance.balance);
+        }
+      } catch {
+        if (!cancelled) {
+          setError('상점 정보를 불러오지 못했어요.');
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  function getStatus(item: ShopItem): ShopItemStatus {
+  const visibleItems = useMemo(() => {
+    if (activeTab === 'liked') return []; // 백엔드에 찜(liked) 개념이 없어 항상 빈 상태.
+    if (activeTab === 'owned') return items.filter((item) => item.owned);
+    return items.filter((item) => item.tab === activeTab);
+  }, [activeTab, items]);
+
+  function getStatus(item: Item): ShopItemStatus {
     if (activeTab === 'owned') return 'listed';
-    if (!ownedIds.has(item.id)) return 'buy';
-    return equippedByCategory[item.category] === item.id ? 'equipped' : 'equip';
+    if (!item.owned) return 'buy';
+    return item.equipped ? 'equipped' : 'equip';
   }
 
-  function handleItemPress(item: ShopItem) {
+  async function handleItemPress(item: Item) {
     if (activeTab === 'owned') return;
+    setActionError(null);
 
-    if (!ownedIds.has(item.id)) {
-      if (coins < item.price) return; // TODO: 포인트 부족 피드백 (백엔드는 409 반환)
-      setCoins((prev) => prev - item.price);
-      setOwnedIds((prev) => new Set(prev).add(item.id));
-      // TODO: wire up to POST /api/shop/items/{itemId}/purchase
+    if (!item.owned) {
+      try {
+        const result = await purchaseItem(item.id);
+        setCoins(result.remainingPoints);
+        setItems((prev) => prev.map((it) => (it.id === item.id ? { ...it, owned: true } : it)));
+      } catch (e) {
+        // 백엔드 409는 "이미 구매"와 "포인트 부족" 둘 다에 쓰여 status만으로는 구분이 안 되고,
+        // ApiError.message(GlobalExceptionHandler가 내려주는 실제 사유)로만 구분할 수 있다.
+        setActionError(e instanceof ApiError ? e.message : '구매에 실패했어요.');
+      }
       return;
     }
 
-    setEquippedByCategory((prev) => {
-      const next = { ...prev };
-      if (prev[item.category] === item.id) {
-        delete next[item.category];
-      } else {
-        next[item.category] = item.id; // 같은 카테고리 내 기존 착용 아이템 자동 해제
-      }
-      // TODO: wire up to PATCH /api/shop/items/{itemId}/equip
-      return next;
-    });
+    try {
+      const result = await toggleEquipItem(item.id);
+      setItems((prev) =>
+        prev.map((it) => {
+          if (it.id === item.id) return { ...it, equipped: result.isEquipped };
+          // 같은 탭(=백엔드 카테고리) 내 기존 착용 아이템은 백엔드가 자동 해제하므로 화면도 맞춘다.
+          if (it.tab === item.tab && result.isEquipped) return { ...it, equipped: false };
+          return it;
+        }),
+      );
+    } catch (e) {
+      setActionError(e instanceof ApiError ? e.message : '착용에 실패했어요.');
+    }
   }
 
   return (
@@ -169,24 +187,32 @@ export default function ShopScreen() {
           <ShopTabBar active={activeTab} onChange={setActiveTab} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
-          {visibleItems.map((item) => (
-            <ShopItemCard
-              key={item.id}
-              price={item.price}
-              image={item.image}
-              placeholderIcon={
-                item.image ? undefined : (() => {
-                  const Icon = CATEGORY_PLACEHOLDER_ICON[item.category];
-                  return <Icon width={40} height={40} />;
-                })()
-              }
-              status={getStatus(item)}
-              onPress={() => handleItemPress(item)}
-            />
-          ))}
-          {visibleItems.length === 0 && <Text style={styles.emptyText}>아직 아이템이 없어요.</Text>}
-        </ScrollView>
+        {actionError && <Text style={styles.actionErrorText}>{actionError}</Text>}
+
+        {loading ? (
+          <ActivityIndicator style={styles.statusIndicator} color="#3A4039" />
+        ) : error ? (
+          <Text style={styles.emptyText}>{error}</Text>
+        ) : (
+          <ScrollView contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
+            {visibleItems.map((item) => (
+              <ShopItemCard
+                key={item.id}
+                price={item.price}
+                image={item.imageUrl}
+                placeholderIcon={
+                  item.imageUrl ? undefined : (() => {
+                    const Icon = CATEGORY_PLACEHOLDER_ICON[item.tab];
+                    return <Icon width={40} height={40} />;
+                  })()
+                }
+                status={getStatus(item)}
+                onPress={() => handleItemPress(item)}
+              />
+            ))}
+            {visibleItems.length === 0 && <Text style={styles.emptyText}>아직 아이템이 없어요.</Text>}
+          </ScrollView>
+        )}
       </View>
     </View>
   );
@@ -258,5 +284,15 @@ const styles = StyleSheet.create({
     marginTop: 40,
     fontSize: 14,
     color: '#7A8272',
+  },
+  statusIndicator: {
+    marginTop: 40,
+  },
+  actionErrorText: {
+    marginTop: 4,
+    paddingHorizontal: 14,
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#C0392B',
   },
 });

@@ -84,7 +84,19 @@ async function request<T>(path: string, init?: RequestInit, isRetryAfterReissue 
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, `${init?.method ?? 'GET'} ${path} failed: ${response.status}`);
+    // 백엔드 GlobalExceptionHandler는 {status, error, message} 형태의 본문을 내려준다.
+    // 같은 status 코드가 서로 다른 원인을 가리키는 경우(예: 409가 "이미 구매"와 "포인트 부족" 둘 다에 쓰임)
+    // 이 message로 구분해야 하므로 최대한 살려서 전달한다.
+    let message = `${init?.method ?? 'GET'} ${path} failed: ${response.status}`;
+    try {
+      const body = (await response.json()) as { message?: string };
+      if (body?.message) {
+        message = body.message;
+      }
+    } catch {
+      // 본문이 JSON이 아니거나 비어있으면 기본 메시지를 사용한다.
+    }
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {
@@ -301,6 +313,23 @@ export function getMyMascots(): Promise<Mascot[]> {
   return request<Mascot[]>('/api/mascots/me');
 }
 
+// ---- mascot (마스코트 도감 전체 — 미보유 포함) ----
+// GET /api/mascots/me와 달리 지역별 마스코트 전체 목록 + 보유 여부를 함께 내려준다.
+// dev 시드 기준 지역 1개 = 마스코트 1개라 전체 개수는 지역 수만큼(현재 2개)뿐이다.
+
+export type MascotEntry = {
+  mascotId: number;
+  regionId: number;
+  name: string;
+  imageUrl: string | null;
+  acquired: boolean;
+  acquiredAt: string | null;
+};
+
+export function getMascots(): Promise<MascotEntry[]> {
+  return request<MascotEntry[]>('/api/mascots');
+}
+
 export type Badge = {
   code: string;
   name: string;
@@ -315,6 +344,24 @@ export function getMyBadges(): Promise<Badge[]> {
   return request<Badge[]>('/api/badges/me');
 }
 
+// ---- badge (칭호 도장판 전체 — 미보유 포함) ----
+// GET /api/badges/me와 달리 8단계 칭호 전체 + 보유 여부를 함께 내려준다. 정렬 순서는 보장되지
+// 않으므로(백엔드 findAll() 그대로) 도장판에 표시할 때는 requiredMascotCount 기준으로 직접 정렬한다.
+
+export type BadgeEntry = {
+  code: string;
+  name: string;
+  description: string;
+  requiredMascotCount: number;
+  iconUrl: string;
+  acquired: boolean;
+  acquiredAt: string | null;
+};
+
+export function getBadges(): Promise<BadgeEntry[]> {
+  return request<BadgeEntry[]>('/api/badges');
+}
+
 export type VisitedRegion = {
   regionId: number;
   regionName: string;
@@ -323,6 +370,67 @@ export type VisitedRegion = {
 
 export function getVisitedRegions(): Promise<VisitedRegion[]> {
   return request<VisitedRegion[]>('/api/locations/visits');
+}
+
+// ---- regions (지역 기준 정보) ----
+// GET /api/locations/regions는 인증 불필요(permitAll). dev 시드는 강릉시(51150)/서울특별시(11000) 2곳뿐.
+
+export type Region = {
+  id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  verificationRadiusMeters: number;
+};
+
+export function getRegions(): Promise<Region[]> {
+  return request<Region[]>('/api/locations/regions');
+}
+
+// ---- map (지도 화면 관광지 조회) ----
+// GET /api/map/**은 전부 인증 불필요(permitAll).
+
+export type AttractionSummary = {
+  contentId: string;
+  title: string;
+  latitude: number | null;
+  longitude: number | null;
+  imageUrl: string | null;
+};
+
+export type AttractionDetail = {
+  contentId: string;
+  title: string;
+  address: string | null;
+  description: string | null;
+  images: string[];
+};
+
+export function getRegionAttractions(regionId: number): Promise<AttractionSummary[]> {
+  return request<AttractionSummary[]>(`/api/map/regions/${regionId}/attractions`);
+}
+
+export function getNearbyAttractions(
+  latitude: number,
+  longitude: number,
+  radiusMeters?: number,
+): Promise<AttractionSummary[]> {
+  const params = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+  });
+  if (radiusMeters != null) {
+    params.set('radiusMeters', String(radiusMeters));
+  }
+  return request<AttractionSummary[]>(`/api/map/nearby?${params.toString()}`);
+}
+
+export function searchAttractions(keyword: string): Promise<AttractionSummary[]> {
+  return request<AttractionSummary[]>(`/api/map/search?keyword=${encodeURIComponent(keyword)}`);
+}
+
+export function getAttractionDetail(contentId: string): Promise<AttractionDetail> {
+  return request<AttractionDetail>(`/api/map/attractions/${encodeURIComponent(contentId)}`);
 }
 
 // ---- location (위치 인증) ----
@@ -391,6 +499,62 @@ export type PointBalance = {
 
 export function getMyPointBalance(): Promise<PointBalance> {
   return request<PointBalance>('/api/points/me');
+}
+
+// ---- shop (상점) ----
+// 이슈 #8(백엔드 이슈 #64) — 백엔드 카테고리를 Figma "옷 갈아입히기" 5탭 구조(상의/하의/모자/신발/악세서리)에
+// 맞춰 TOP/BOTTOM/HAT/SHOES/ACCESSORY 5종으로 재편했다. 기존 GLASSES/BAG/CARRIER는 ACCESSORY로 흡수.
+
+export type ItemCategory = 'TOP' | 'BOTTOM' | 'HAT' | 'SHOES' | 'ACCESSORY';
+
+export type ShopItem = {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  category: ItemCategory;
+};
+
+export function getShopItems(): Promise<ShopItem[]> {
+  return request<ShopItem[]>('/api/shop/items');
+}
+
+export type MyShopItem = {
+  id: number;
+  name: string;
+  imageUrl: string;
+  category: ItemCategory;
+  isEquipped: boolean;
+  purchasedAt: string;
+};
+
+export function getMyShopItems(): Promise<MyShopItem[]> {
+  return request<MyShopItem[]>('/api/shop/items/me');
+}
+
+export type PurchaseItemResponse = {
+  itemId: number;
+  itemName: string;
+  remainingPoints: number;
+};
+
+// 실패 시 ApiError.status로 원인을 구분한다: 404(아이템 없음) / 409(이미 구매 또는 포인트 부족 —
+// 어느 쪽인지는 ApiError.message로만 구분 가능, 둘 다 409라 status만으로는 못 가른다).
+export function purchaseItem(itemId: number): Promise<PurchaseItemResponse> {
+  return request<PurchaseItemResponse>(`/api/shop/items/${itemId}/purchase`, { method: 'POST' });
+}
+
+export type EquipItemResponse = {
+  itemId: number;
+  isEquipped: boolean;
+};
+
+// 토글 방식 — 미착용 상태면 착용, 착용 상태면 해제. 같은 카테고리 내 중복 착용 방지는 백엔드가
+// 보장하므로(비관적 락 + DB 부분 유니크 인덱스) FE에서 추가로 막을 필요 없다.
+// 실패 시 ApiError.status: 404(아이템 없음) / 403(미구매).
+export function toggleEquipItem(itemId: number): Promise<EquipItemResponse> {
+  return request<EquipItemResponse>(`/api/shop/items/${itemId}/equip`, { method: 'PATCH' });
 }
 
 export { ApiError };

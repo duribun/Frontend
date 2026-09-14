@@ -1,34 +1,119 @@
 import { Image } from 'expo-image';
+import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ChevronLeftIcon from '@/assets/icons/map/chevron-left.svg';
 import { AttractionCard } from '@/components/map/attraction-card';
 import { SearchBar } from '@/components/map/search-bar';
+import {
+  type AttractionSummary,
+  getNearbyAttractions,
+  getRegionAttractions,
+  getRegions,
+  searchAttractions,
+} from '@/lib/api';
 
 const COLLAPSED_HEIGHT = 150;
 const EXPANDED_HEIGHT = 620;
+const SEARCH_DEBOUNCE_MS = 400;
+const LOCATION_TIMEOUT_MS = 8000;
 
-// TODO: replace with GET /api/map/regions/{regionId}/attractions or GET /api/map/nearby.
-const MOCK_ATTRACTIONS = [
-  { id: '1', title: '경복궁', description: '조선 왕조를 대표하는 법궁', location: '서울 종로구' },
-  { id: '2', title: '해운대 해수욕장', description: '부산을 대표하는 해수욕장', location: '부산 해운대구' },
-  { id: '3', title: '성심당', description: '대전을 대표하는 빵집', location: '대전 중구' },
-  { id: '4', title: '경포호', description: '동해와 맞닿은 호수', location: '강원 강릉시' },
-  { id: '5', title: '자갈치시장', description: '부산의 대표 수산시장', location: '부산 중구' },
-];
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+// 위치 권한이 있으면 현재 위치 주변 관광지를, 없거나 조회에 실패/지연되면 등록된 지역들의
+// 관광지 목록으로 대체한다 (GET /api/map/**, GET /api/locations/regions 모두 인증 불필요).
+// 실내 등 GPS 신호가 잡히지 않는 환경에서 getCurrentPositionAsync가 무한 대기하지 않도록 타임아웃을 둔다.
+async function loadDefaultAttractions(): Promise<AttractionSummary[]> {
+  const current = await Location.getForegroundPermissionsAsync();
+  const granted =
+    current.status === 'granted' ? true : (await Location.requestForegroundPermissionsAsync()).status === 'granted';
+
+  if (granted) {
+    try {
+      const position = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        LOCATION_TIMEOUT_MS,
+      );
+      return await getNearbyAttractions(position.coords.latitude, position.coords.longitude);
+    } catch {
+      // 위치 조회 실패/타임아웃 시 지역 기반 목록으로 폴백
+    }
+  }
+
+  const regions = await getRegions();
+  const lists = await Promise.all(regions.map((region) => getRegionAttractions(region.id)));
+  return lists.flat();
+}
 
 export default function MapScreen() {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [query, setQuery] = useState('');
+  const [attractions, setAttractions] = useState<AttractionSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const sheetStyle = useAnimatedStyle(() => ({
     height: withTiming(expanded ? EXPANDED_HEIGHT : COLLAPSED_HEIGHT, { duration: 250 }),
   }));
+
+  useEffect(() => {
+    const keyword = query.trim();
+    let cancelled = false;
+
+    async function run(fetcher: () => Promise<AttractionSummary[]>, failureMessage: string) {
+      setLoading(true);
+      setError(null);
+      try {
+        const results = await fetcher();
+        if (!cancelled) {
+          setAttractions(results);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(failureMessage);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    if (keyword.length === 0) {
+      run(loadDefaultAttractions, '관광지 정보를 불러오지 못했어요.');
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const timer = setTimeout(() => {
+      run(() => searchAttractions(keyword), '검색에 실패했어요.');
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   return (
     <View style={styles.container}>
@@ -64,15 +149,19 @@ export default function MapScreen() {
 
           {expanded && (
             <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
-              {MOCK_ATTRACTIONS.map((attraction) => (
-                <View key={attraction.id} style={styles.listItem}>
-                  <AttractionCard
-                    title={attraction.title}
-                    description={attraction.description}
-                    location={attraction.location}
-                  />
-                </View>
-              ))}
+              {loading ? (
+                <ActivityIndicator style={styles.statusIndicator} color="#8A8A8A" />
+              ) : error ? (
+                <Text style={styles.statusText}>{error}</Text>
+              ) : attractions.length === 0 ? (
+                <Text style={styles.statusText}>표시할 관광지가 없어요.</Text>
+              ) : (
+                attractions.map((attraction) => (
+                  <View key={attraction.contentId} style={styles.listItem}>
+                    <AttractionCard title={attraction.title} imageUrl={attraction.imageUrl} />
+                  </View>
+                ))
+              )}
             </ScrollView>
           )}
         </View>
@@ -155,5 +244,14 @@ const styles = StyleSheet.create({
   },
   listItem: {
     marginBottom: 12,
+  },
+  statusIndicator: {
+    marginTop: 24,
+  },
+  statusText: {
+    marginTop: 24,
+    textAlign: 'center',
+    fontSize: 14,
+    color: '#8A8A8A',
   },
 });
