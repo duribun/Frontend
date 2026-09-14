@@ -31,12 +31,6 @@ const MAX_PHOTOS = 4;
 
 type Photo = { uri: string; isRemote: boolean };
 
-function nowTimeSuffix(): string {
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-}
-
 export default function RecordWriteScreen() {
   const router = useRouter();
   const { date, id } = useLocalSearchParams<{ date?: string; id?: string }>();
@@ -135,7 +129,8 @@ export default function RecordWriteScreen() {
         title: title.trim(),
         content: content.trim(),
         imageUrls,
-        visitedAt: isEditing ? `${visitedDateKey}T${nowTimeSuffix()}` : `${visitedDateKey}T${nowTimeSuffix()}`,
+        // BE의 visitedAt은 LocalDate(날짜만)라서 시간 성분을 붙여 보내면 Jackson이 400으로 거부한다.
+        visitedAt: visitedDateKey,
         // 방문 장소 선택 UI는 지도 검색 SDK 담당 팀원과 협의 후 별도로 붙일 예정 (docs/ISSUE-여행기록-구현.md 참고).
         // 그 전까지는 항상 장소 미등록(all-or-nothing 중 "없음" 쪽) 상태로 저장한다.
         place: null,

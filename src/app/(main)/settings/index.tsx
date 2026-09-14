@@ -24,8 +24,8 @@ export default function SettingsHomeScreen() {
           try {
             await logout();
           } catch {
-            // NOTE: 소셜 로그인이 아직 TEMP 바이패스라 실제 세션 종료가 의미 없을 수 있다 (API-NEEDS-설정.md 3번).
-            // 실패하더라도 로컬에서는 그냥 스플래시로 돌려보낸다.
+            // 로그아웃 API 실패(네트워크 등)와 무관하게 로컬 토큰은 logout() 내부에서 항상 지워지므로,
+            // 여기서는 실패해도 그냥 스플래시로 돌려보낸다.
           }
           router.replace('/(onboarding)/splash');
         },

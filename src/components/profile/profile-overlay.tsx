@@ -10,7 +10,7 @@ import DogIcon from '@/assets/icons/profile/dog.svg';
 import PictureIcon from '@/assets/icons/profile/picture.svg';
 import WritingIcon from '@/assets/icons/profile/writing.svg';
 import type { Gender } from '@/context/user-profile-context';
-import { getMyBadges, getMyMascots, getMyProfile, listAllRecords } from '@/lib/api';
+import { ApiError, getMyBadges, getMyMascots, getMyProfile, listAllRecords } from '@/lib/api';
 
 // 아래 색상/좌표/폰트는 피그마 노드(VERd4hScPHYynIZaTQzFkM, node 559:4746/818:2530 "프로필아이콘")의
 // get_design_context 결과에서 그대로 가져온 값이다. 카드 배경("여행증", 1092:1770 — 링/스트랩/톱니 테두리/
@@ -59,18 +59,6 @@ const PROFILE_SOURCE = {
   MALE: require('@/assets/images/onboarding/character-male.png'),
 } as const;
 
-// TEMP: 소셜 로그인이 아직 실제 인증 연동 전(TEMP 바이패스)이라 아래 API 호출이 전부 401로 실패한다.
-// 기획팀 시연 영상 촬영을 위해, 실패 시 에러 알림 대신 아래 목데이터로 화면을 채운다.
-// 실제 인증이 붙으면 이 폴백은 지우고 다시 실패 시 Alert.alert로 에러를 보여줘야 한다.
-const MOCK_PROFILE: ProfileData = {
-  nickname: '두리번 여행자',
-  birthDate: '2000-05-14',
-  gender: 'FEMALE',
-  title: '여행 입문자',
-  mascotCount: 12,
-  recordCount: 8,
-};
-
 function formatBirthDate(birthDate: string | null): string {
   if (!birthDate) return '00/00';
   const parts = birthDate.split('-');
@@ -100,11 +88,13 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
   });
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ProfileData | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
     setLoading(true);
+    setErrorMessage(null);
 
     Promise.all([getMyProfile(), getMyMascots(), getMyBadges(), listAllRecords()])
       .then(([profile, mascots, badges, records]) => {
@@ -119,11 +109,14 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
           recordCount: records.length,
         });
       })
-      .catch(() => {
-        // TEMP: 위 MOCK_PROFILE 주석 참고 — 실제 인증 연동 전까지 실패 시 목데이터로 대체.
-        if (!cancelled) {
-          setData(MOCK_PROFILE);
-        }
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setData(null);
+        setErrorMessage(
+          error instanceof ApiError
+            ? `프로필을 불러오지 못했어요. (${error.status})`
+            : '프로필을 불러오지 못했어요.',
+        );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -148,9 +141,11 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
 
       <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
         <View style={styles.content} pointerEvents="box-none">
-          {loading || !data ? (
-            <ActivityIndicator color={TITLE_COLOR} />
-          ) : (
+          {loading && <ActivityIndicator color={TITLE_COLOR} />}
+
+          {!loading && errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
+
+          {!loading && !errorMessage && data && (
             <View style={styles.cardWrap}>
               {/* 링/스트랩/톱니 테두리/모서리 잎 장식까지 전부 포함된 통짜 배경 이미지.
                   이 이미지 자체가 CARD_W/CARD_H(346×423) 전체를 담고 있어서, 아래 콘텐츠는
@@ -270,6 +265,12 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
 const styles = StyleSheet.create({
   scrim: {
     backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  errorText: {
+    textAlign: 'center',
+    color: '#FEFEFE',
+    fontSize: 14,
+    paddingHorizontal: 24,
   },
   safeArea: {
     flex: 1,
