@@ -53,10 +53,11 @@ function pos(x: number, y: number, w?: number, h?: number): PosStyle {
   return style;
 }
 
-// TODO: 메인 화면과 동일하게, 남자 프로필 정식 에셋이 아직 없어 온보딩 캐릭터 이미지를 임시로 재사용한다.
+// 프로필 클로즈업 사진 — 피그마 정식 목업(node 818:2673 "남캐")에서 export받은 에셋으로 교체 완료
+// (docs/ISSUE-성별캐릭터-프로필이미지버그.md 2번). 메인 화면 헤더 아이콘과 이 이미지 하나를 공유해서 쓴다.
 const PROFILE_SOURCE = {
   FEMALE: require('@/assets/images/main/profile-girl.png'),
-  MALE: require('@/assets/images/onboarding/character-male.png'),
+  MALE: require('@/assets/images/main/profile-boy.png'),
 } as const;
 
 function formatBirthDate(birthDate: string | null): string {
@@ -172,6 +173,7 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
                     style={styles.photoImage}
                     contentFit="cover"
                     contentPosition="top"
+                    recyclingKey={`profile-${gender}`}
                   />
                 </View>
 
@@ -228,12 +230,10 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
                 <Text style={[styles.figText, font, styles.statValue, pos(191, 532, 42, 30)]}>
                   {data.mascotCount}명
                 </Text>
-                {/* 강아지-고양이 간격: 8px로 좁혔던 것도 성호님이 Figma 프로토타입 실제 스크린샷
-                    (node 818:2530, 402×874 — 이 프레임은 1:1 스케일이라 픽셀=디자인 좌표)과 비교해서
-                    보내준 참고 이미지 기준으로 보면 여전히 넓었다 — 그 스크린샷에서는 둘이 거의
-                    맞닿아 보인다. 3px로 더 좁힘. */}
+                {/* 강아지-고양이 간격: 8px → 3px로 좁혔는데도 성호님이 보기엔 여전히 떨어져 보인다고 해서,
+                    강아지 오른쪽 끝(177+33=210)에 고양이 왼쪽 끝을 딱 맞춰 간격을 0으로 없앴다. */}
                 <DogIcon width={33} height={33} style={pos(177, 500, 33, 33)} />
-                <CatIcon width={30} height={30} style={[pos(213, 503, 30, 30), styles.mirroredIcon]} />
+                <CatIcon width={30} height={30} style={[pos(210, 503, 30, 30), styles.mirroredIcon]} />
 
                 {/* "칸(구분선으로 나뉜 3칸) 가운데 정렬"을 기준으로 다시 정리한다.
                     카드 좌측 끝(28)~구분선1(154)인 "생일" 칸은 수학적 중심이 91인데, 라벨/아이콘/값이

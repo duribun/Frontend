@@ -16,17 +16,20 @@ import { getMyPointBalance } from '@/lib/api';
 
 const SWIPE_THRESHOLD = 60;
 
-// TODO: 메인 화면 아트 스타일에 맞는 실제 남자 캐릭터/프로필 에셋이 아직 없어서
+// TODO: 메인 화면 아트 스타일에 맞는 실제 남자 전신 캐릭터 에셋이 아직 없어서
 // 온보딩 카드용 character-male.png를 임시로 재사용한다 (docs/ISSUE-캐릭터성별연동-온보딩가이드.md 참고).
-// 실제 에셋이 나오면 assets/images/main/character-boy.png, profile-boy.png로 교체하고 이 매핑만 갈아끼우면 된다.
+// 실제 에셋이 나오면 assets/images/main/character-boy.png로 교체하고 이 매핑만 갈아끼우면 된다.
 const CHARACTER_SOURCE = {
   FEMALE: require('@/assets/images/main/character-girl.png'),
   MALE: require('@/assets/images/onboarding/character-male.png'),
 } as const;
 
+// 프로필 클로즈업 사진 — 피그마 정식 목업(node 818:2673 "남캐")에서 export받은 에셋으로 교체 완료
+// (docs/ISSUE-성별캐릭터-프로필이미지버그.md 2번). 헤더 아이콘/프로필 오버레이 카드 둘 다 이 이미지 하나를
+// 공유해서 쓰고, 담기는 박스 크기만 style로 다르게 잘라 보여준다.
 const PROFILE_SOURCE = {
   FEMALE: require('@/assets/images/main/profile-girl.png'),
-  MALE: require('@/assets/images/onboarding/character-male.png'),
+  MALE: require('@/assets/images/main/profile-boy.png'),
 } as const;
 
 export default function MainScreen() {
@@ -129,6 +132,7 @@ export default function MainScreen() {
                 style={styles.profileImage}
                 contentFit="cover"
                 contentPosition="top"
+                recyclingKey={`profile-${gender}`}
               />
             </Pressable>
           </View>
