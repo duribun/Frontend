@@ -1,9 +1,11 @@
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import StampBoardDeco from '@/assets/icons/collection/stamp-board-deco.svg';
 import { CollectionBoard } from '@/components/collection/collection-board';
+import { getBadges } from '@/lib/api';
 
 type Tier = {
   id: string;
@@ -12,7 +14,6 @@ type Tier = {
   leftPct: number;
   topPct: number;
   decorative: boolean;
-  reached: boolean;
 };
 
 // Positions below are read off the Figma board (390x797) as percentages of the board
@@ -26,28 +27,49 @@ type Tier = {
 // threshold = 칭호 획득에 필요한 마스코트 수 (기획 확정값). 화면에는 표시하지 않고
 // reached 판정 로직(보유 마스코트 수와 비교)에만 사용 — TODO: 실제 보유 수와 연동.
 const TIERS: Tier[] = [
-  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 20.72, topPct: 18.95, decorative: false, reached: true },
-  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 79.4, topPct: 18.82, decorative: false, reached: false },
-  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 79.55, topPct: 25.61, decorative: true, reached: false },
-  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 79.55, topPct: 32.27, decorative: true, reached: false },
-  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 79.55, topPct: 38.92, decorative: true, reached: false },
-  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 79.55, topPct: 45.71, decorative: true, reached: false },
-  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 79.55, topPct: 59.15, decorative: true, reached: false },
-  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 79.55, topPct: 72.09, decorative: true, reached: false },
+  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 20.72, topPct: 18.95, decorative: false },
+  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 79.4, topPct: 18.82, decorative: false },
+  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 79.55, topPct: 25.61, decorative: true },
+  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 79.55, topPct: 32.27, decorative: true },
+  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 79.55, topPct: 38.92, decorative: true },
+  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 79.55, topPct: 45.71, decorative: true },
+  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 79.55, topPct: 59.15, decorative: true },
+  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 79.55, topPct: 72.09, decorative: true },
 ];
 
-// Centers deliberately coincide with the "seed"/"beginner" tier labels above — an
-// earned stamp visually covers its tier's name (matches the Figma mock).
-const EARNED_STAMPS = [
-  { leftPct: 20.72, topPct: 20.74 },
-  { leftPct: 79.28, topPct: 20.74 },
-  { leftPct: 20.72, topPct: 27.4 },
-];
+// 도장은 자기 칭호 라벨과 같은 left에, top만 살짝 내려서(=라벨을 덮도록) 찍힌다 — Figma 목업에서
+// "새싹"/"입문자" 두 라벨 위에 찍힌 도장 좌표를 실측해 얻은 공통 오프셋(+1.8~1.92%, 평균값 사용).
+const STAMP_TOP_OFFSET_PCT = 1.85;
 
 export default function CollectionStampScreen() {
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
+  const [reachedThresholds, setReachedThresholds] = useState<Set<number> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const badges = await getBadges();
+        if (!cancelled) {
+          setReachedThresholds(
+            new Set(badges.filter((badge) => badge.acquired).map((badge) => badge.requiredMascotCount)),
+          );
+        }
+      } catch {
+        // 도장판 배경/라벨은 항상 보여주고, 실패 시 획득 여부만 전부 미획득으로 둔다.
+        if (!cancelled) {
+          setReachedThresholds(new Set());
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadingBadges = reachedThresholds === null;
 
   return (
     <CollectionBoard>
@@ -63,31 +85,40 @@ export default function CollectionStampScreen() {
 
         <Text style={[styles.ribbonText, fontsLoaded && styles.ribbonTextFont]}>여행 도장</Text>
 
-        {TIERS.map((tier) => (
-          <View key={tier.id} style={[styles.tierLabel, { left: `${tier.leftPct}%`, top: `${tier.topPct}%` }]}>
-            {tier.label.map((line, i) => (
-              <Text
-                key={i}
-                style={[
-                  styles.tierText,
-                  tier.decorative && fontsLoaded && styles.tierTextFont,
-                  tier.reached && styles.tierTextReached,
-                ]}
-              >
-                {line}
-              </Text>
-            ))}
-          </View>
-        ))}
+        {TIERS.map((tier) => {
+          const reached = !loadingBadges && reachedThresholds.has(tier.threshold);
+          return (
+            <View key={tier.id} style={[styles.tierLabel, { left: `${tier.leftPct}%`, top: `${tier.topPct}%` }]}>
+              {tier.label.map((line, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.tierText,
+                    tier.decorative && fontsLoaded && styles.tierTextFont,
+                    reached && styles.tierTextReached,
+                  ]}
+                >
+                  {line}
+                </Text>
+              ))}
+            </View>
+          );
+        })}
 
-        {EARNED_STAMPS.map((stamp, i) => (
-          <Image
-            key={i}
-            source={require('@/assets/images/collection/stamp-icon.png')}
-            style={[styles.stamp, { left: `${stamp.leftPct}%`, top: `${stamp.topPct}%` }]}
-            contentFit="contain"
-          />
-        ))}
+        {!loadingBadges &&
+          TIERS.filter((tier) => reachedThresholds.has(tier.threshold)).map((tier) => (
+            <Image
+              key={tier.id}
+              source={require('@/assets/images/collection/stamp-icon.png')}
+              style={[
+                styles.stamp,
+                { left: `${tier.leftPct}%`, top: `${tier.topPct + STAMP_TOP_OFFSET_PCT}%` },
+              ]}
+              contentFit="contain"
+            />
+          ))}
+
+        {loadingBadges && <ActivityIndicator style={styles.statusIndicator} color="#535D51" />}
       </View>
     </CollectionBoard>
   );
@@ -99,6 +130,12 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 390 / 797,
     alignSelf: 'center',
+  },
+  statusIndicator: {
+    position: 'absolute',
+    top: '46%',
+    left: 0,
+    right: 0,
   },
   boardImage: {
     ...StyleSheet.absoluteFill,
