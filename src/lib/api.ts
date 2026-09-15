@@ -433,6 +433,23 @@ export function getAttractionDetail(contentId: string): Promise<AttractionDetail
   return request<AttractionDetail>(`/api/map/attractions/${encodeURIComponent(contentId)}`);
 }
 
+// ---- place (기록 작성 화면 방문 장소 검색) ----
+// GET /api/places/search는 인증 불필요(permitAll). map 도메인의 /api/map/search와 달리 관광지로
+// 제한하지 않고 전체 콘텐츠 타입(음식점/숙박 등 포함)을 검색하며, 결과를 캐싱하지 않는 단순 프록시다
+// (BE docs/ISSUE-장소검색-TourAPI프록시.md). 검색어가 2자 미만이면 BE가 빈 배열을 즉시 반환한다.
+// address는 드롭다운 표시용일 뿐 RecordPlace에는 없는 필드라 저장하지 않는다.
+
+export type PlaceSearchResult = {
+  placeName: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+export function searchPlaces(keyword: string): Promise<PlaceSearchResult[]> {
+  return request<PlaceSearchResult[]>(`/api/places/search?keyword=${encodeURIComponent(keyword)}`);
+}
+
 // ---- location (위치 인증) ----
 // NOTE: 이 함수를 실제로 호출하는 화면(메인 화면 수집 아이콘 `handleFrame`, GPS 기반
 // 관광지 방문 인증 플로우) 자체는 아직 FE에 구현되어 있지 않다 (docs/ISSUE-BGM-구현.md 참고).
