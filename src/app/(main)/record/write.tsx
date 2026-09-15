@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,9 +20,12 @@ import {
   ApiError,
   createRecord,
   getRecord,
+  searchPlaces,
   updateRecord,
   uploadRecordImage,
   type Mood,
+  type PlaceSearchResult,
+  type RecordPlace,
   type Weather,
 } from '@/lib/api';
 
@@ -48,6 +51,14 @@ export default function RecordWriteScreen() {
   const [temperature, setTemperature] = useState('20');
   const [mood, setMood] = useState<Mood>('HAPPY');
 
+  const [placeQuery, setPlaceQuery] = useState('');
+  const [selectedPlace, setSelectedPlace] = useState<RecordPlace | null>(null);
+  const [placeSuggestions, setPlaceSuggestions] = useState<PlaceSearchResult[]>([]);
+  const [placeSearchState, setPlaceSearchState] = useState<'idle' | 'loading' | 'empty' | 'error'>('idle');
+  // 장소를 선택/해제하거나(handleSelectPlace/handleClearPlace) 기존 기록을 불러와 placeQuery를
+  // 코드로 채울 때(아래 getRecord), 그 직후의 debounce 검색 1회를 건너뛰기 위한 플래그.
+  const skipNextPlaceSearchRef = useRef(false);
+
   useEffect(() => {
     if (!isEditing || editingId === null) return;
     let cancelled = false;
@@ -62,6 +73,15 @@ export default function RecordWriteScreen() {
         setTemperature(String(record.temperature));
         setMood(record.mood);
         setVisitedDateKey(record.visitedAt.slice(0, 10));
+        if (record.placeName && record.latitude != null && record.longitude != null) {
+          skipNextPlaceSearchRef.current = true;
+          setSelectedPlace({
+            placeName: record.placeName,
+            latitude: record.latitude,
+            longitude: record.longitude,
+          });
+          setPlaceQuery(record.placeName);
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -76,6 +96,63 @@ export default function RecordWriteScreen() {
       cancelled = true;
     };
   }, [isEditing, editingId]);
+
+  // 방문 장소 검색 디바운스 (~300ms) — 짧은 검색어(2자 미만)는 BE 호출 없이 즉시 결과 목록을 비운다
+  // (BE도 동일 기준으로 빈 배열을 즉시 반환하지만, 타이핑 중 불필요한 요청 자체를 줄이기 위해 FE에서도 막는다).
+  useEffect(() => {
+    if (skipNextPlaceSearchRef.current) {
+      skipNextPlaceSearchRef.current = false;
+      return;
+    }
+
+    const trimmed = placeQuery.trim();
+    if (trimmed.length < 2) {
+      setPlaceSuggestions([]);
+      setPlaceSearchState('idle');
+      return;
+    }
+
+    setPlaceSearchState('loading');
+    const timer = setTimeout(() => {
+      searchPlaces(trimmed)
+        .then((results) => {
+          // RecordPlace는 latitude/longitude가 필수라, 좌표가 없는 결과는 애초에 선택 불가능하므로 제외한다.
+          const withCoords = results.filter(
+            (place): place is PlaceSearchResult & { latitude: number; longitude: number } =>
+              place.latitude != null && place.longitude != null,
+          );
+          setPlaceSuggestions(withCoords);
+          setPlaceSearchState(withCoords.length === 0 ? 'empty' : 'idle');
+        })
+        .catch(() => {
+          setPlaceSuggestions([]);
+          setPlaceSearchState('error');
+        });
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [placeQuery]);
+
+  function handlePlaceQueryChange(text: string) {
+    setPlaceQuery(text);
+    // 선택 후 텍스트를 직접 고치면 이전 선택은 더 이상 유효하지 않다.
+    setSelectedPlace(null);
+  }
+
+  function handleSelectPlace(place: PlaceSearchResult & { latitude: number; longitude: number }) {
+    skipNextPlaceSearchRef.current = true;
+    setSelectedPlace({ placeName: place.placeName, latitude: place.latitude, longitude: place.longitude });
+    setPlaceQuery(place.placeName);
+    setPlaceSuggestions([]);
+    setPlaceSearchState('idle');
+  }
+
+  function handleClearPlace() {
+    setSelectedPlace(null);
+    setPlaceQuery('');
+    setPlaceSuggestions([]);
+    setPlaceSearchState('idle');
+  }
 
   async function handlePickPhoto() {
     if (photos.length >= MAX_PHOTOS) return;
@@ -131,9 +208,9 @@ export default function RecordWriteScreen() {
         imageUrls,
         // BE의 visitedAt은 LocalDate(날짜만)라서 시간 성분을 붙여 보내면 Jackson이 400으로 거부한다.
         visitedAt: visitedDateKey,
-        // 방문 장소 선택 UI는 지도 검색 SDK 담당 팀원과 협의 후 별도로 붙일 예정 (docs/ISSUE-여행기록-구현.md 참고).
-        // 그 전까지는 항상 장소 미등록(all-or-nothing 중 "없음" 쪽) 상태로 저장한다.
-        place: null,
+        // 장소를 검색해 선택하면 selectedPlace가 채워지고, 아무것도 선택하지 않으면(또는 선택을
+        // 해제하면) null로 저장된다 — all-or-nothing 중 "없음" 쪽 (BE CreateRecordRequest 참고).
+        place: selectedPlace,
         weather,
         temperature: Number(temperature) || 0,
         mood,
@@ -223,8 +300,58 @@ export default function RecordWriteScreen() {
           />
 
           <Text style={styles.sectionLabel}>방문 장소</Text>
-          <View style={styles.placeStub}>
-            <Text style={styles.placeStubLabel}>장소를 선택하지 않은 기록으로 저장돼요.</Text>
+          <View style={styles.placeSearchWrap}>
+            <TextInput
+              value={placeQuery}
+              onChangeText={handlePlaceQueryChange}
+              placeholder="장소를 검색해보세요. 비워두면 장소 없이 저장돼요."
+              placeholderTextColor="#B7B2A6"
+              style={styles.placeInput}
+            />
+            {selectedPlace && (
+              <Pressable onPress={handleClearPlace} style={styles.placeSelectedRow} hitSlop={8}>
+                <Text style={styles.placeSelectedLabel} numberOfLines={1}>
+                  📍 {selectedPlace.placeName}
+                </Text>
+                <Text style={styles.placeClearLabel}>선택 해제</Text>
+              </Pressable>
+            )}
+            {!selectedPlace && placeQuery.trim().length >= 2 && (
+              <View style={styles.placeDropdown}>
+                {placeSearchState === 'loading' && (
+                  <View style={styles.placeDropdownRow}>
+                    <ActivityIndicator size="small" color={GREEN} />
+                  </View>
+                )}
+                {placeSearchState === 'error' && (
+                  <Text style={styles.placeDropdownMessage}>
+                    장소를 찾을 수 없어요. 잠시 후 다시 시도해주세요.
+                  </Text>
+                )}
+                {placeSearchState === 'empty' && (
+                  <Text style={styles.placeDropdownMessage}>검색 결과가 없어요.</Text>
+                )}
+                {placeSearchState === 'idle' &&
+                  placeSuggestions.map((place, index) => (
+                    <Pressable
+                      key={`${place.placeName}-${place.address ?? index}`}
+                      onPress={() =>
+                        handleSelectPlace(place as PlaceSearchResult & { latitude: number; longitude: number })
+                      }
+                      style={styles.placeDropdownRow}
+                    >
+                      <Text style={styles.placeDropdownName} numberOfLines={1}>
+                        {place.placeName}
+                      </Text>
+                      {place.address && (
+                        <Text style={styles.placeDropdownAddress} numberOfLines={1}>
+                          {place.address}
+                        </Text>
+                      )}
+                    </Pressable>
+                  ))}
+              </View>
+            )}
           </View>
 
           <Text style={styles.sectionLabel}>날씨</Text>
@@ -385,16 +512,69 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333333',
   },
-  placeStub: {
+  placeSearchWrap: {
+    position: 'relative',
+    zIndex: 10,
+  },
+  placeInput: {
     height: 44,
     borderRadius: 12,
     backgroundColor: '#FEFEFE',
-    justifyContent: 'center',
+    paddingHorizontal: 14,
+    fontSize: 14,
+    color: '#333333',
+  },
+  placeSelectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#F0EDE3',
+  },
+  placeSelectedLabel: {
+    flex: 1,
+    fontSize: 13,
+    color: '#4A4A4A',
+    marginRight: 8,
+  },
+  placeClearLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#B04A3C',
+  },
+  placeDropdown: {
+    marginTop: 6,
+    borderRadius: 12,
+    backgroundColor: '#FEFEFE',
+    paddingVertical: 4,
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  placeDropdownRow: {
+    paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  placeStubLabel: {
+  placeDropdownName: {
     fontSize: 13,
-    color: '#B7B2A6',
+    fontWeight: '600',
+    color: '#333333',
+  },
+  placeDropdownAddress: {
+    fontSize: 11,
+    color: '#9A9A9A',
+    marginTop: 2,
+  },
+  placeDropdownMessage: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 12,
+    color: '#9A9A9A',
   },
   optionRow: {
     flexDirection: 'row',
