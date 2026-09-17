@@ -4,6 +4,7 @@ import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Ellipse } from 'react-native-svg';
 
 import RefreshIcon from '@/assets/icons/main/refresh.svg';
 import SettingsIcon from '@/assets/icons/main/settings.svg';
@@ -161,18 +162,21 @@ export default function MainScreen() {
         />
         <IconButton
           source={require('@/assets/images/main/icon-map.png')}
-          width={63}
-          height={51}
+          width={78}
+          height={56}
           onPress={() => router.push('/(main)/map')}
         />
       </View>
 
       <View style={styles.characterStage} pointerEvents="none">
-        <Image
-          source={require('@/assets/images/main/character-shadow.png')}
-          style={styles.characterShadow}
-          contentFit="contain"
-        />
+        {/* borderRadius로 만든 모양은 위아래가 평평한 "알약(스타디움)" 형태라 아무리 넓혀도
+            각져 보였다 — react-native-svg의 Ellipse로 실제 곡선 타원을 그림. viewBox를 정사각형
+            (0~100, 0~100)으로 두고 반지름 50짜리 원을 채운 뒤 preserveAspectRatio="none"으로
+            컨테이너 비율(styles.characterShadow의 width/aspectRatio)에 맞게 늘려서 납작한
+            타원으로 만든다. */}
+        <Svg style={styles.characterShadow} viewBox="0 0 100 100" preserveAspectRatio="none">
+          <Ellipse cx={50} cy={50} rx={50} ry={50} fill="rgba(20, 20, 20, 0.22)" />
+        </Svg>
         <Image
           source={CHARACTER_SOURCE[gender]}
           style={styles.character}
@@ -222,11 +226,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   profileButton: {
+    // 성호님 요청: 프로필 원형 흰 테두리가 두꺼워 보여서 축소 (2 → 1). 피그마 자체에는
+    // 이 테두리가 없지만(마스크 원과 캐릭터 이미지만 존재), 배경과 구분되도록 얇게 유지.
     width: 51,
     height: 51,
     borderRadius: 25.5,
     overflow: 'hidden',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#FFFFFF',
   },
   profileImage: {
@@ -238,23 +244,26 @@ const styles = StyleSheet.create({
     left: '4%',
     top: '20.4%',
     gap: 20,
+    alignItems: 'center',
   },
   characterStage: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: '26%',
+    bottom: '28%',
     alignItems: 'center',
   },
   characterShadow: {
     position: 'absolute',
-    bottom: '-3%',
-    width: '80%',
-    aspectRatio: 305 / 89,
+    alignSelf: 'center',
+    bottom: -6,
+    width: '55%',
+    aspectRatio: 9,
+    transform: [{ translateX: 10 }],
   },
   character: {
-    width: '58%',
-    aspectRatio: 198 / 396,
+    width: '70%',
+    aspectRatio: 200 / 400,
   },
   signpostWrap: {
     position: 'absolute',
@@ -272,9 +281,9 @@ const styles = StyleSheet.create({
     top: '22%',
     left: 0,
     right: 0,
-    lineHeight: 32,
+    lineHeight: 40,
     textAlign: 'center',
-    fontSize: 26,
+    fontSize: 34,
     fontWeight: '700',
     color: '#3D2109',
   },
