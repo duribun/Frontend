@@ -41,10 +41,13 @@ const styles = StyleSheet.create({
     color: '#3A4039',
   },
   coin: {
+    // [팀원 요청 1번: 동전 위치] 피그마(노드 757:1805)에서는 동전 아이콘이 알약 왼쪽으로
+    // 자기 너비의 약 42%(≈18px/44px)만큼 튀어나와 겹치는 구조. -18/-6으로 1차 조정했지만
+    // 실기로 보니 아직 부족하다는 성호님 피드백으로 좀 더 키움.
     position: 'absolute',
-    left: -4,
-    top: -4,
-    width: 44,
-    height: 44,
+    left: -17,
+    top: -1,
+    width: 52,
+    height: 52,
   },
 });
