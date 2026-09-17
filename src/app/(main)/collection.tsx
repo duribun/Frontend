@@ -39,7 +39,7 @@ export default function CollectionScreen() {
           <Text style={[styles.cardTitle, fontsLoaded && styles.cardTitleFont]}>도장판</Text>
           <View style={styles.cardPreview}>
             <Image
-              source={require('@/assets/images/collection/stamp-icon.png')}
+              source={require('@/assets/images/collection/stamp-icon-preview.png')}
               style={styles.stampPreviewImage}
               contentFit="contain"
             />
@@ -89,14 +89,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mascotPreviewImage: {
-    width: 110,
-    height: 110,
+    width: 160,
+    height: 123,
   },
   mascotFlower: {
     marginTop: -6,
   },
   stampPreviewImage: {
-    width: 110,
-    height: 110,
+    width: 165,
+    height: 118,
   },
 });
