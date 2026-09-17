@@ -142,11 +142,16 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
 
       <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
         <View style={styles.content} pointerEvents="box-none">
-          {loading && <ActivityIndicator color={TITLE_COLOR} />}
+          {/* [팀원 요청 1번 후속] fontsLoaded도 로딩 조건에 포함시켜서, 커스텀 폰트가 아직 준비되기 전에
+              카드 텍스트가 시스템 기본 폰트로 잠깐 그려졌다가 폰트 로드 후 다시 그려지는(그 순간에만
+              "폰트가 안 맞아 보이는") 상황 자체를 없앴다. */}
+          {(loading || !fontsLoaded) && <ActivityIndicator color={TITLE_COLOR} />}
 
-          {!loading && errorMessage && <Text style={styles.errorText}>{errorMessage}</Text>}
+          {!loading && fontsLoaded && errorMessage && (
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          )}
 
-          {!loading && !errorMessage && data && (
+          {!loading && fontsLoaded && !errorMessage && data && (
             <View style={styles.cardWrap}>
               {/* 링/스트랩/톱니 테두리/모서리 잎 장식까지 전부 포함된 통짜 배경 이미지.
                   이 이미지 자체가 CARD_W/CARD_H(346×423) 전체를 담고 있어서, 아래 콘텐츠는
@@ -158,16 +163,16 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
               />
 
               <View style={styles.card}>
-                {/* 사진 박스는 배경 PNG에 이미 그려진 그라데이션 placeholder를 직접 측정한
-                    좌표(60,310,108,130)를 그대로 쓴다 — Figma의 "실제 사진이 채워진" 목업(818:2530,
-                    남캐 818:2673)은 이보다 작은 좌표(61,324,106,116)를 쓰지만, 그건 그 목업 프레임
-                    자체에 종속된 값이고 우리가 실제로 다운로드해 쓰는 카드 배경 PNG의 placeholder
-                    도형과는 크기가 다르다. 더 작은 좌표를 쓰면 사진이 그 placeholder보다 작아져서
-                    background PNG에 이미 그려진 하늘색 그라데이션이 사진 가장자리 밖으로 삐져나와
-                    보이는(색이 비치는) 문제가 생긴다 — 실측값(60,310,108,130)을 유지해 placeholder를
-                    완전히 덮는 쪽이 더 안전하다. 모서리 잎 장식과 살짝 겹치는 것은 이 배경 PNG
-                    자체에 이미 그렇게 그려져 있는 것이라 사진 유무와 무관하게 동일하다. */}
-                <View style={[styles.photoBox, pos(60, 310, 108, 130)]}>
+                {/* [프로필 사진이 옆에 비해 위아래로 길쭉해 보이는 문제] 기존 (60,310,108,130) —
+                    가로세로비 108:130≈0.83 — 은 Figma 목업(61,324,106,116, 비율 106:116≈0.91)보다
+                    훨씬 세로로 길쭉했다. `contentFit="cover"`는 박스가 세로로 길수록 사진을 더
+                    확대해서 가로를 잘라내기 때문에, 이 세로 길쭉함 자체가 에뮬레이터 사진이 Figma보다
+                    더 확대되고 갑갑해 보이는(옆으로도 여백 없이 꽉 차 보이는) 원인이었다. 아래쪽
+                    경계(310+130=440, 배경 placeholder를 덮으려고 잡아둔 기준선)는 그대로 유지한 채
+                    위쪽만 12px 줄여서(310→322, 130→118) 비율을 108:118≈0.92로 Figma 원본과 거의
+                    동일하게 맞췄다. 이제 배경 카드 자체가 placeholder 그라데이션 없는 새 에셋이라
+                    위쪽 경계를 덜 확장해도 색이 비칠 걱정은 없다. */}
+                <View style={[styles.photoBox, pos(60, 322, 108, 118)]}>
                   <Image
                     source={PROFILE_SOURCE[gender]}
                     style={styles.photoImage}
@@ -178,11 +183,11 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
                 </View>
 
                 <Text
-                  style={[styles.figText, font, styles.headingText, pos(181.5, 316, 120, 22)]}
+                  style={[styles.figText, font, styles.headingText, pos(183.5, 316, 120, 22)]}
                   numberOfLines={1}
                   ellipsizeMode="clip"
                 >
-                  🌿 여행자 정보
+                  여행자 정보
                 </Text>
 
                 {/* "프로필" 리본 배지는 배경 이미지에 이미 그려져 있어서(사진 옆의 초록 리본),
@@ -219,21 +224,25 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
                 <Text style={[styles.figText, font, styles.statLabel, pos(92.5, 479, 30, 15)]}>
                   생일
                 </Text>
-                <Text style={[styles.figText, font, styles.statValue, pos(68, 532, 81, 30)]}>
+                <Text style={[styles.figText, font, styles.statValue, pos(68, 537, 81, 30)]}>
                   {formatBirthDate(data.birthDate)}
                 </Text>
-                <CakeIcon width={41} height={41} style={pos(89, 494, 41, 41)} />
+                <CakeIcon width={41} height={41} style={pos(88, 494, 41, 41)} />
 
                 <Text style={[styles.figText, font, styles.statLabel, pos(171, 479, 68, 15)]}>
                   획득 마스코트
                 </Text>
-                <Text style={[styles.figText, font, styles.statValue, pos(191, 532, 42, 30)]}>
+                {/* [팀원 요청 6번: 0명 위치] 이 좌표(191,532)는 이미 Figma 선언값과 거의 일치하고, 위
+                    강아지/고양이 아이콘 클러스터 중심(약 208)과도 크게 어긋나지 않아서 구체적으로 뭐가
+                    잘못됐는지 특정하지 못해 값은 그대로 뒀다 — 실기로 보고 어느 방향(x=191 앞의 숫자)으로
+                    옮기고 싶은지 알려주면 그 방향으로 조정하면 된다. */}
+                <Text style={[styles.figText, font, styles.statValue, pos(188, 537, 42, 30)]}>
                   {data.mascotCount}명
                 </Text>
                 {/* 강아지-고양이 간격: 8px → 3px로 좁혔는데도 성호님이 보기엔 여전히 떨어져 보인다고 해서,
                     강아지 오른쪽 끝(177+33=210)에 고양이 왼쪽 끝을 딱 맞춰 간격을 0으로 없앴다. */}
                 <DogIcon width={33} height={33} style={pos(177, 500, 33, 33)} />
-                <CatIcon width={30} height={30} style={[pos(210, 503, 30, 30), styles.mirroredIcon]} />
+                <CatIcon width={30} height={30} style={[pos(208, 503, 30, 30), styles.mirroredIcon]} />
 
                 {/* "칸(구분선으로 나뉜 3칸) 가운데 정렬"을 기준으로 다시 정리한다.
                     카드 좌측 끝(28)~구분선1(154)인 "생일" 칸은 수학적 중심이 91인데, 라벨/아이콘/값이
@@ -245,13 +254,20 @@ export function ProfileOverlay({ visible, onClose }: ProfileOverlayProps) {
                     쌍이 이미 그 위치(283-309, 중심 296)에 있다. 라벨/값을 아이콘과 같은 중심(297)에
                     맞춘다(지난 수정에서 "칸의 수학적 중심"(314.5)으로 되돌린 건 "생일" 칸의 이 패턴을
                     놓친 과교정이었다). */}
-                <Text style={[styles.figText, font, styles.statLabel, pos(249, 479, 96, 15)]}>
+                {/* [팀원 요청 4번: 기록 개수 위치] 아이콘을 Figma 선언 크기(30×40)로 복원하면서 아이콘
+                    클러스터 중심이 283~317(중심 300)으로 바뀌었다 — 라벨/값도 그 중심에 맞춰 3px씩 오른쪽으로
+                    같이 옮겼다. 그래도 여전히 위치가 이상해 보이면 이 좌표(pos의 첫 번째 숫자, x좌표)를
+                    직접 조정하면 된다. */}
+                <Text style={[styles.figText, font, styles.statLabel, pos(252, 479, 96, 15)]}>
                   기록 개수
                 </Text>
-                <Text style={[styles.figText, font, styles.statValue, pos(264, 532, 66, 30)]}>
+                <Text style={[styles.figText, font, styles.statValue, pos(267, 537, 66, 30)]}>
                   {data.recordCount}개
                 </Text>
-                <WritingIcon width={20} height={30} style={pos(289, 500, 20, 30)} />
+                {/* [팀원 요청 5번: 기록 개수 그림 위치 및 크기] 기존엔 20×30으로 Figma 선언값(30×40, 좌표
+                    287,498)보다 작게 잡혀 있어서 사진 아이콘(18×18)에 비해 연필 아이콘이 왜소해 보이고,
+                    그 아래 텍스트(라벨/값)와도 클러스터 중심이 안 맞았다. Figma 선언값 그대로 복원. */}
+                <WritingIcon width={30} height={35} style={pos(287, 498, 30, 40)} />
                 <PictureIcon width={18} height={18} style={pos(283, 498, 18, 18)} />
               </View>
             </View>
@@ -282,8 +298,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     // 실제 메인 화면의 헤더(설정/코인/프로필 아바타)가 이 오버레이 밑에 그대로 비쳐 보이므로,
     // 카드가 그 위로 겹치지 않도록 상단 여백을 헤더 높이만큼 띄워둔다.
-    paddingTop: 90,
-    paddingBottom: 40,
+    // [프로필 카드 전체 위치] justifyContent:'center'로 가운데 정렬되는 위치는 paddingTop과
+    // paddingBottom의 "차이"에 좌우된다 — paddingTop이 paddingBottom보다 클수록 카드가 아래로 쏠려
+    // 보인다. 90/40 → 75/55 → 65/65 → 0/65 순으로 좁혀오다가 성호님이 실기로 보면서 0/65(카드를
+    // 최대한 위로)로 최종 확정. 이 헤더 겹침 방지용 상단 여백(맨 위 주석)은 이제 paddingTop이 아니라
+    // 카드가 위로 붙어도 안 겹치는 실제 위치로 자연스럽게 대체된 상태 — 더 조정하고 싶으면 이 두 값을
+    // 계속 같은 방식으로 건드리면 된다.
+    paddingTop: 0,
+    paddingBottom: 65,
   },
   cardWrap: {
     width: '100%',
@@ -316,15 +338,26 @@ const styles = StyleSheet.create({
   photoBox: {
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#DCEEDC',
+    // 원래 있던 '#DCEEDC' 민트색은 캐릭터 PNG의 투명한 모서리 틈으로 옛 카드 배경(그라데이션
+    // placeholder)이 비치지 않게 깔아둔 안전망이었다. 새로 받은 카드 배경 에셋(고리 투명 처리본)엔
+    // 그 placeholder가 없어서, 실제로 합성해보니(시뮬레이션 확인) 투명하게 둬도 이음매 없이 깔끔하게
+    // 카드 배경이 그대로 비친다 — 그래서 제거했다. 나중에 카드 배경을 또 바꿨는데 사진 모서리에
+    // 이상한 색이 비치면 이 자리에 다시 배경색을 넣으면 된다.
+    backgroundColor: 'transparent',
   },
   photoImage: {
     width: '100%',
     height: '100%',
+    transform: [{ scale: 1 }]
   },
+  // [팀원 요청 1번: 글씨체 변경 및 통일] fontWeight: '700'을 커스텀 폰트(Cafe24Ssurround)와 같이 쓰고
+  // 있었는데, 이 폰트 파일은 웨이트가 하나뿐이다(assets/fonts에 Bold 컷이 따로 없음) — RN은 커스텀 폰트에
+  // fontWeight를 얹어도 안드로이드에서는 합성 볼드를 만들어주지 않아서, 실제로는 무시되거나 플랫폼마다
+  // 다르게 처리돼 "폰트가 안 맞다"는 인상을 준다. 아래 텍스트 스타일들에서 fontWeight를 전부 제거했다 —
+  // 폰트 파일 자체가 이미 두꺼운 스타일이라 눈에 띄는 변화는 없을 것이다. 만약 여전히 두께가 다르게
+  // 보인다면 Cafe24 쪽에서 Bold 전용 폰트 파일을 새로 받아와야 한다(현재는 그런 파일이 없음).
   headingText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 18,
     color: TITLE_COLOR,
   },
   pill: {
@@ -336,18 +369,15 @@ const styles = StyleSheet.create({
   pillText: {
     position: 'relative',
     fontSize: 9,
-    fontWeight: '700',
     color: PILL_TEXT_COLOR,
   },
   titleText: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 30,
     color: TITLE_COLOR,
     textAlign: 'right',
   },
   nameText: {
-    fontSize: 19,
-    fontWeight: '700',
+    fontSize: 30,
     color: NAME_COLOR,
     textAlign: 'right',
   },
@@ -364,8 +394,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   statValue: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 24,
     color: TITLE_COLOR,
     // statLabel은 원래부터 textAlign:'center'였는데 값(statValue) 쪽엔 빠져 있어서, 라벨/아이콘은
     // 칸 가운데 정렬인데 값만 왼쪽 정렬로 보여 "생일 값이 왼쪽으로 쏠려 보인다"는 문제가 있었다.
