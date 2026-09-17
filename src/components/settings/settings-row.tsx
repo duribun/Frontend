@@ -57,9 +57,10 @@ const styles = StyleSheet.create({
   },
   label: {
     flex: 1,
-    fontSize: 15,
+    // [팀원 요청 1번: 내용 글자 색상] 피그마(노드 358:2837) 항목 라벨 값 그대로: #828282 / 16px.
+    fontSize: 16,
     fontWeight: '500',
-    color: '#222222',
+    color: '#828282',
   },
   right: {
     flexDirection: 'row',
