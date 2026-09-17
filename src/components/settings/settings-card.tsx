@@ -30,15 +30,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 13,
+    // [팀원 요청 1번: 부제목 글자 색상] 피그마(노드 358:2837) 섹션 제목 값 그대로: #535D51 / 17px.
+    fontSize: 17,
     fontWeight: '600',
-    color: '#8A8A8A',
+    color: '#535D51',
     marginLeft: 4,
   },
   card: {
     backgroundColor: '#FEFEFE',
     borderRadius: 14,
     overflow: 'hidden',
+    // [팀원 요청 2번: 배경 색상(칸은 회색 테두리)] 피그마 카드 테두리(#EDEDED, 2px) 추가.
+    borderWidth: 2,
+    borderColor: '#EDEDED',
   },
   divider: {
     height: 1,

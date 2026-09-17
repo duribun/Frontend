@@ -87,7 +87,8 @@ export default function LoginAccountScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF1D3',
+    // [팀원 요청 2번: 배경 색상(노란색 -> 흰색 배경에 칸은 회색 테두리)] 노란 배경 -> 흰색.
+    backgroundColor: '#FEFEFE',
   },
   safeArea: {
     flex: 1,
