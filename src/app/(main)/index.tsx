@@ -12,11 +12,12 @@ import SettingsIcon from '@/assets/icons/main/settings.svg';
 import { CoinBadge } from '@/components/main/coin-badge';
 import { IconButton } from '@/components/main/icon-button';
 import { MascotAcquiredOverlay, type AcquiredMascot } from '@/components/collection/mascot-acquired-overlay';
+import { BadgeAcquiredOverlay, type AcquiredBadge } from '@/components/main/badge-acquired-overlay';
 import { OnboardingGuide } from '@/components/onboarding/onboarding-guide';
 import { ProfileOverlay } from '@/components/profile/profile-overlay';
 import { useSoundSettings } from '@/context/sound-settings-context';
 import { useUserProfile } from '@/context/user-profile-context';
-import { getMyPointBalance, getRegions, verifyLocation } from '@/lib/api';
+import { getMyBadges, getMyPointBalance, getRegions, verifyLocation } from '@/lib/api';
 
 const SWIPE_THRESHOLD = 60;
 // (main)/map.tsx의 loadDefaultAttractions()와 동일한 이유(실내 등 GPS 신호가 안 잡히는 환경에서
@@ -102,6 +103,9 @@ export default function MainScreen() {
   const [regionName, setRegionName] = useState('지역명');
   const [verifyingLocation, setVerifyingLocation] = useState(false);
   const [acquiredMascot, setAcquiredMascot] = useState<AcquiredMascot | null>(null);
+  const [acquiredBadge, setAcquiredBadge] = useState<AcquiredBadge | null>(null);
+  // 마스코트 팝업을 먼저 닫아야 칭호 팝업이 뜨도록(동시에 두 팝업을 겹쳐 띄우지 않으려고) 대기시켜두는 값.
+  const pendingBadgeRef = useRef<AcquiredBadge | null>(null);
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
@@ -178,6 +182,11 @@ export default function MainScreen() {
     if (verifyingLocation) return;
     setVerifyingLocation(true);
     try {
+      // 칭호(BadgeAcquiredOverlay)는 서버 응답에 안 실려 있어서(VerifyLocationResponse는
+      // newlyAcquiredMascots만 준다) 위치 인증 전/후 보유 칭호 목록을 직접 비교해서 감지한다.
+      // 마스코트 인증과 동시에 병렬로 미리 가져와두면 위치 조회 대기 시간에 묻혀서 추가 지연이 없다.
+      const badgesBeforePromise = getMyBadges();
+
       const current = await Location.getForegroundPermissionsAsync();
       const granted =
         current.status === 'granted'
@@ -248,6 +257,19 @@ export default function MainScreen() {
         // (MascotAcquiredOverlay)을 띄우고, 효과음은 기존처럼 그대로 재생한다.
         playMascotAcquiredSound();
         setAcquiredMascot({ name: result.newlyAcquiredMascots[0].name, regionName: result.regionName });
+
+        // docs/ISSUE-메인화면칭호획득연출구현.md — 칭호는 마스코트 획득 수 임계값에 따라 BE가
+        // 자동으로 부여한다(BadgeService.handleMascotAcquired). 방금 새로 생긴 칭호가 있는지는
+        // "이번 verifyLocation 호출 전/후 getMyBadges() 응답 차이"로 판별한다. getMyBadges()는
+        // 보유한 칭호만 내려주므로(전체 8단계 아님) code가 새로 등장했으면 신규 획득이다.
+        const badgesBefore = await badgesBeforePromise;
+        const beforeCodes = new Set(badgesBefore.map((badge) => badge.code));
+        const badgesAfter = await getMyBadges();
+        const newlyAcquiredBadge = badgesAfter.find((badge) => !beforeCodes.has(badge.code));
+        if (newlyAcquiredBadge) {
+          // 마스코트 팝업이 이미 떠있으니 칭호 팝업은 그걸 닫은 뒤(onConfirm) 이어서 띄운다.
+          pendingBadgeRef.current = { name: newlyAcquiredBadge.name };
+        }
       }
     } catch (error) {
       // 임시 디버깅: 원래 catch{}로 실제 에러를 그냥 삼켰는데, 에뮬레이터에서 실패 원인이(권한/GPS
@@ -359,7 +381,17 @@ export default function MainScreen() {
 
       <OnboardingGuide visible={guideVisible} onFinish={() => setGuideVisible(false)} />
       <ProfileOverlay visible={profileVisible} onClose={() => setProfileVisible(false)} />
-      <MascotAcquiredOverlay mascot={acquiredMascot} onConfirm={() => setAcquiredMascot(null)} />
+      <MascotAcquiredOverlay
+        mascot={acquiredMascot}
+        onConfirm={() => {
+          setAcquiredMascot(null);
+          if (pendingBadgeRef.current) {
+            setAcquiredBadge(pendingBadgeRef.current);
+            pendingBadgeRef.current = null;
+          }
+        }}
+      />
+      <BadgeAcquiredOverlay badge={acquiredBadge} onConfirm={() => setAcquiredBadge(null)} />
     </View>
   );
 }
