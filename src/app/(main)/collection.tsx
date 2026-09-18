@@ -20,6 +20,7 @@ export default function CollectionScreen() {
           // NOTE: 신규 collection-mascot 라우트라 로컬 typed routes 갱신 전까지 `as Href` 캐스팅.
           onPress={() => router.push('/(main)/collection-mascot' as Href)}
         >
+          <View style={styles.mascotGroundShadow} />
           <Text style={[styles.cardTitle, fontsLoaded && styles.cardTitleFont]}>마스코트</Text>
           <View style={styles.cardPreview}>
             <Image
@@ -27,7 +28,7 @@ export default function CollectionScreen() {
               style={styles.mascotPreviewImage}
               contentFit="contain"
             />
-            <FlowerDeco width={140} height={25} style={styles.mascotFlower} />
+            <FlowerDeco width={194} height={35} style={styles.mascotFlower} />
           </View>
         </Pressable>
 
@@ -39,7 +40,7 @@ export default function CollectionScreen() {
           <Text style={[styles.cardTitle, fontsLoaded && styles.cardTitleFont]}>도장판</Text>
           <View style={styles.cardPreview}>
             <Image
-              source={require('@/assets/images/collection/stamp-icon.png')}
+              source={require('@/assets/images/collection/stamp-icon-preview.png')}
               style={styles.stampPreviewImage}
               contentFit="contain"
             />
@@ -89,14 +90,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   mascotPreviewImage: {
-    width: 110,
-    height: 110,
+    width: 160,
+    height: 123,
   },
   mascotFlower: {
-    marginTop: -6,
+    marginTop: -34,
+  },
+  mascotGroundShadow: {
+    position: 'absolute',
+    left: 26,
+    top: 155,
+    width: 154,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#C4D98C',
   },
   stampPreviewImage: {
-    width: 110,
-    height: 110,
+    width: 165,
+    height: 118,
+    transform: [{ translateY: -12 }],
   },
 });
