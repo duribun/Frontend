@@ -88,14 +88,32 @@ export default function CollectionStampScreen() {
           const reached = !loadingBadges && reachedThresholds.has(tier.threshold);
           return (
             <View key={tier.id} style={[styles.tierLabel, { left: `${tier.leftPct}%`, top: `${tier.topPct}%` }]}>
-              {tier.label.map((line, i) => (
-                <Text
-                  key={i}
-                  style={[styles.tierText, fontsLoaded && styles.tierTextFont, reached && styles.tierTextReached]}
-                >
-                  {line}
-                </Text>
-              ))}
+              {tier.label.map((line, i) =>
+                // Cafe24Ssurround 폰트의 '싹'(쌍시옷 초성) 글리프가 Android에서 fontSize
+                // 12~16 부근에 렌더링되지 않는 버그 우회. 24px로 그린 뒤 절반으로 축소해서
+                // 정상 렌더링이 확인된 24px 래스터화 경로를 타게 한다.
+                line === '새싹' ? (
+                  <View key={i} style={styles.saessakWrap}>
+                    <Text
+                      style={[
+                        styles.tierText,
+                        fontsLoaded && styles.tierTextFont,
+                        reached && styles.tierTextReached,
+                        styles.saessakText,
+                      ]}
+                    >
+                      {line}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    key={i}
+                    style={[styles.tierText, fontsLoaded && styles.tierTextFont, reached && styles.tierTextReached]}
+                  >
+                    {line}
+                  </Text>
+                ),
+              )}
             </View>
           );
         })}
@@ -171,6 +189,17 @@ const styles = StyleSheet.create({
   },
   tierTextReached: {
     opacity: 0.51,
+  },
+  saessakWrap: {
+    height: 15,
+    width: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saessakText: {
+    fontSize: 24,
+    lineHeight: 30,
+    transform: [{ scale: 0.5 }],
   },
   stamp: {
     position: 'absolute',
