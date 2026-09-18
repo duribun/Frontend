@@ -13,7 +13,6 @@ type Tier = {
   threshold: number;
   leftPct: number;
   topPct: number;
-  decorative: boolean;
 };
 
 // Positions below are read off the Figma board (390x797) as percentages of the board
@@ -27,14 +26,14 @@ type Tier = {
 // threshold = 칭호 획득에 필요한 마스코트 수 (기획 확정값). 화면에는 표시하지 않고
 // reached 판정 로직(보유 마스코트 수와 비교)에만 사용 — TODO: 실제 보유 수와 연동.
 const TIERS: Tier[] = [
-  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 20.72, topPct: 18.95, decorative: false },
-  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 79.4, topPct: 18.82, decorative: false },
-  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 79.55, topPct: 25.61, decorative: true },
-  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 79.55, topPct: 32.27, decorative: true },
-  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 79.55, topPct: 38.92, decorative: true },
-  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 79.55, topPct: 45.71, decorative: true },
-  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 79.55, topPct: 59.15, decorative: true },
-  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 79.55, topPct: 72.09, decorative: true },
+  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 18.97, topPct: 19.57 },
+  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 73.85, topPct: 19.45 },
+  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 73.85, topPct: 26.1 },
+  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 73.85, topPct: 32.62 },
+  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 73.85, topPct: 39.15 },
+  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 73.85, topPct: 52.32 },
+  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 73.85, topPct: 65.5 },
+  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 73.85, topPct: 78.17 },
 ];
 
 // 도장은 자기 칭호 라벨과 같은 left에, top만 살짝 내려서(=라벨을 덮도록) 찍힌다 — Figma 목업에서
@@ -89,18 +88,32 @@ export default function CollectionStampScreen() {
           const reached = !loadingBadges && reachedThresholds.has(tier.threshold);
           return (
             <View key={tier.id} style={[styles.tierLabel, { left: `${tier.leftPct}%`, top: `${tier.topPct}%` }]}>
-              {tier.label.map((line, i) => (
-                <Text
-                  key={i}
-                  style={[
-                    styles.tierText,
-                    tier.decorative && fontsLoaded && styles.tierTextFont,
-                    reached && styles.tierTextReached,
-                  ]}
-                >
-                  {line}
-                </Text>
-              ))}
+              {tier.label.map((line, i) =>
+                // Cafe24Ssurround 폰트의 '싹'(쌍시옷 초성) 글리프가 Android에서 fontSize
+                // 12~16 부근에 렌더링되지 않는 버그 우회. 24px로 그린 뒤 절반으로 축소해서
+                // 정상 렌더링이 확인된 24px 래스터화 경로를 타게 한다.
+                line === '새싹' ? (
+                  <View key={i} style={styles.saessakWrap}>
+                    <Text
+                      style={[
+                        styles.tierText,
+                        fontsLoaded && styles.tierTextFont,
+                        reached && styles.tierTextReached,
+                        styles.saessakText,
+                      ]}
+                    >
+                      {line}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text
+                    key={i}
+                    style={[styles.tierText, fontsLoaded && styles.tierTextFont, reached && styles.tierTextReached]}
+                  >
+                    {line}
+                  </Text>
+                ),
+              )}
             </View>
           );
         })}
@@ -176,6 +189,17 @@ const styles = StyleSheet.create({
   },
   tierTextReached: {
     opacity: 0.51,
+  },
+  saessakWrap: {
+    height: 15,
+    width: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saessakText: {
+    fontSize: 24,
+    lineHeight: 30,
+    transform: [{ scale: 0.5 }],
   },
   stamp: {
     position: 'absolute',
