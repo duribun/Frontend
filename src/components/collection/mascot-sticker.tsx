@@ -1,5 +1,7 @@
-import { Image, type ImageSource } from 'expo-image';
+import { Image } from 'expo-image';
 import { StyleSheet, Text, View } from 'react-native';
+
+import { MASCOT_IMAGE_BY_NAME } from '@/constants/mascot';
 
 type MascotStickerProps = {
   name: string;
@@ -8,20 +10,10 @@ type MascotStickerProps = {
 
 // docs/ISSUE-마스코트도감-로컬에셋매핑.md — 마스코트 10종은 사용자 업로드가 아니라 고정된 세트고,
 // 앱의 다른 그래픽도 전부 로컬 번들 에셋으로 처리하므로 BE가 원격 imageUrl을 호스팅하지 않기로 했다.
-// 이름 기준으로 로컬 에셋에 매핑한다(mascotId/regionId는 시드를 다시 하면 값이 바뀔 수 있어 불안정).
-const MASCOT_IMAGE_BY_NAME: Record<string, ImageSource> = {
-  강치: require('@/assets/images/collection/mascot-sealion-char.png'),
-  해치: require('@/assets/images/collection/mascot-haechi-char.png'),
-  고래: require('@/assets/images/collection/mascot-whale-char.png'),
-  괭이갈매기: require('@/assets/images/collection/mascot-catcrab-char.png'),
-  동백: require('@/assets/images/collection/mascot-camellia-char.png'),
-  빵: require('@/assets/images/collection/mascot-bread-char.png'),
-  사과: require('@/assets/images/collection/mascot-apple-char.png'),
-  철쭉: require('@/assets/images/collection/mascot-azalea-char.png'),
-  학: require('@/assets/images/collection/mascot-crane-char.png'),
-  노루: require('@/assets/images/collection/mascot-deer-char.png'),
-};
-
+// 이름 기준 로컬 에셋 매핑(`MASCOT_IMAGE_BY_NAME`)은 마스코트 획득 연출 화면
+// (`mascot-acquired-overlay.tsx`, docs/ISSUE-마스코트획득화면-Figma연출구현.md)과 공유하기 위해
+// `constants/mascot.ts`로 옮겼다.
+//
 // Figma gives each mascot its own custom scalloped "cutline" plaque shape, but that
 // layer only exports as a flat silhouette (no per-mascot art) via the design-context
 // asset pipeline, so we fall back to one shared rounded card behind every character.
