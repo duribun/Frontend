@@ -1,8 +1,9 @@
 import { useFonts } from 'expo-font';
 import { Image } from 'expo-image';
+import * as Location from 'expo-location';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Ellipse } from 'react-native-svg';
 
@@ -12,10 +13,43 @@ import { CoinBadge } from '@/components/main/coin-badge';
 import { IconButton } from '@/components/main/icon-button';
 import { OnboardingGuide } from '@/components/onboarding/onboarding-guide';
 import { ProfileOverlay } from '@/components/profile/profile-overlay';
+import { useSoundSettings } from '@/context/sound-settings-context';
 import { useUserProfile } from '@/context/user-profile-context';
-import { getMyPointBalance } from '@/lib/api';
+import { getMyPointBalance, getRegions, verifyLocation } from '@/lib/api';
 
 const SWIPE_THRESHOLD = 60;
+// (main)/map.tsx의 loadDefaultAttractions()와 동일한 이유(실내 등 GPS 신호가 안 잡히는 환경에서
+// getCurrentPositionAsync가 무한 대기하지 않도록)로 타임아웃을 둔다. 값도 그쪽과 동일하게 맞췄다.
+const LOCATION_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+// 두 좌표 사이 거리를 미터 단위로 계산한다(하버사인 공식). 등록된 지역 중 지금 위치가
+// `verificationRadiusMeters` 안에 드는 곳이 있는지 1차로 판별하는 용도 — 실제 인증 성공 여부는
+// verifyLocation() 응답(`verified`)을 신뢰한다.
+function haversineDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const EARTH_RADIUS_METERS = 6371000;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
 // TODO: 메인 화면 아트 스타일에 맞는 실제 남자 전신 캐릭터 에셋이 아직 없어서
 // 온보딩 카드용 character-male.png를 임시로 재사용한다 (docs/ISSUE-캐릭터성별연동-온보딩가이드.md 참고).
@@ -53,10 +87,13 @@ const CHARACTER_SHADOW_WIDTH_PERCENT: Record<'FEMALE' | 'MALE', number> = {
 export default function MainScreen() {
   const router = useRouter();
   const { profile, shouldShowGuide, setShouldShowGuide } = useUserProfile();
+  const { playMascotAcquiredSound } = useSoundSettings();
   const gender = profile.gender ?? 'FEMALE';
   const [guideVisible, setGuideVisible] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
   const [coins, setCoins] = useState(0);
+  const [regionName, setRegionName] = useState('지역명');
+  const [verifyingLocation, setVerifyingLocation] = useState(false);
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
@@ -125,8 +162,63 @@ export default function MainScreen() {
     setProfileVisible(true);
   }
 
-  function handleRefreshRegionName() {
-    // TODO: wire up to the backend location API to re-check the current region.
+  // 성호님 요청(docs/ISSUE-지역명새로고침-위치인증-마스코트획득.md): 새로고침을 누르면 GPS로 현재 위치를
+  // 다시 확인해서 지역명을 갱신하고, 처음 방문한 지역이면 마스코트를 획득한다. `getRegions()`가
+  // regionId를 직접 주지 않으므로, 여기서 하버사인 거리로 반경 안에 드는 지역을 먼저 찾은 뒤
+  // verifyLocation()을 호출하는 순서다(등록된 지역과 겹치면 가장 가까운 한 곳을 선택).
+  async function handleRefreshRegionName() {
+    if (verifyingLocation) return;
+    setVerifyingLocation(true);
+    try {
+      const current = await Location.getForegroundPermissionsAsync();
+      const granted =
+        current.status === 'granted'
+          ? true
+          : (await Location.requestForegroundPermissionsAsync()).status === 'granted';
+
+      if (!granted) {
+        Alert.alert('위치 권한 필요', '현재 위치를 확인하려면 위치 접근 권한이 필요해요.');
+        return;
+      }
+
+      const position = await withTimeout(
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        LOCATION_TIMEOUT_MS,
+      );
+      const { latitude, longitude } = position.coords;
+
+      const regions = await getRegions();
+      let nearestRegion: (typeof regions)[number] | null = null;
+      let nearestDistance = Infinity;
+      for (const region of regions) {
+        const distance = haversineDistanceMeters(latitude, longitude, region.latitude, region.longitude);
+        if (distance <= region.verificationRadiusMeters && distance < nearestDistance) {
+          nearestRegion = region;
+          nearestDistance = distance;
+        }
+      }
+
+      if (!nearestRegion) {
+        // [비고 1: 반경 밖] 등록된 지역과 너무 멀리 떨어져 있으면 팻말은 그대로 두고 안내만 띄운다.
+        Alert.alert('인증 실패', '근처에 등록된 지역이 없어요.');
+        return;
+      }
+
+      const result = await verifyLocation({ regionId: nearestRegion.id, latitude, longitude });
+      setRegionName(result.regionName);
+
+      if (result.isFirstVisit && result.newlyAcquiredMascots.length > 0) {
+        // [비고 2: 마스코트 획득 UI] 전용 축하 팝업/토스트가 아직 없어서, 우선 기존 코드베이스 전반에서
+        // 쓰는 Alert.alert 패턴 그대로 효과음과 함께 안내한다. 더 화려한 UI가 필요하면 후속으로 교체.
+        playMascotAcquiredSound();
+        const names = result.newlyAcquiredMascots.map((mascot) => mascot.name).join(', ');
+        Alert.alert('마스코트 획득!', `${names}을(를) 획득했어요!`);
+      }
+    } catch {
+      Alert.alert('위치 확인 실패', '현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setVerifyingLocation(false);
+    }
   }
 
   return (
@@ -211,9 +303,18 @@ export default function MainScreen() {
           style={styles.signpost}
           contentFit="contain"
         />
-        <Text style={[styles.regionName, fontsLoaded && styles.regionNameFont]}>지역명</Text>
-        <Pressable onPress={handleRefreshRegionName} hitSlop={8} style={styles.refreshButton}>
-          <RefreshIcon width={20} height={20} />
+        <Text style={[styles.regionName, fontsLoaded && styles.regionNameFont]}>{regionName}</Text>
+        <Pressable
+          onPress={handleRefreshRegionName}
+          disabled={verifyingLocation}
+          hitSlop={8}
+          style={styles.refreshButton}
+        >
+          {verifyingLocation ? (
+            <ActivityIndicator size="small" color="#3D2109" />
+          ) : (
+            <RefreshIcon width={20} height={20} />
+          )}
         </Pressable>
       </View>
 
