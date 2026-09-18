@@ -25,15 +25,18 @@ type Tier = {
 // to close the gap it left.
 // threshold = 칭호 획득에 필요한 마스코트 수 (기획 확정값). 화면에는 표시하지 않고
 // reached 판정 로직(보유 마스코트 수와 비교)에만 사용 — TODO: 실제 보유 수와 연동.
+// leftPct는 Figma 텍스트 노드의 왼쪽 가장자리가 아니라 "가로 중심"을 기준으로 계산한 값이다 —
+// tierLabel이 width:56 + marginLeft:-28로 leftPct 지점을 텍스트 중심처럼 쓰기 때문에, 왼쪽 가장자리
+// 좌표를 그대로 넣으면 텍스트 실제 폭의 절반만큼 왼쪽으로 밀려 보인다(실제로 발견된 버그).
 const TIERS: Tier[] = [
-  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 18.97, topPct: 19.57 },
-  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 73.85, topPct: 19.45 },
-  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 73.85, topPct: 26.1 },
-  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 73.85, topPct: 32.62 },
-  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 73.85, topPct: 39.15 },
-  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 73.85, topPct: 52.32 },
-  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 73.85, topPct: 65.5 },
-  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 73.85, topPct: 78.17 },
+  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 21.92, topPct: 19.57 },
+  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 78.33, topPct: 19.45 },
+  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 78.33, topPct: 26.1 },
+  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 78.33, topPct: 32.62 },
+  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 78.33, topPct: 39.15 },
+  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 78.33, topPct: 52.32 },
+  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 78.33, topPct: 65.5 },
+  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 78.33, topPct: 78.17 },
 ];
 
 // 도장은 자기 칭호 라벨과 같은 left에, top만 살짝 내려서(=라벨을 덮도록) 찍힌다 — Figma 목업에서
@@ -88,32 +91,21 @@ export default function CollectionStampScreen() {
           const reached = !loadingBadges && reachedThresholds.has(tier.threshold);
           return (
             <View key={tier.id} style={[styles.tierLabel, { left: `${tier.leftPct}%`, top: `${tier.topPct}%` }]}>
-              {tier.label.map((line, i) =>
-                // Cafe24Ssurround 폰트의 '싹'(쌍시옷 초성) 글리프가 Android에서 fontSize
-                // 12~16 부근에 렌더링되지 않는 버그 우회. 24px로 그린 뒤 절반으로 축소해서
-                // 정상 렌더링이 확인된 24px 래스터화 경로를 타게 한다.
-                line === '새싹' ? (
-                  <View key={i} style={styles.saessakWrap}>
-                    <Text
-                      style={[
-                        styles.tierText,
-                        fontsLoaded && styles.tierTextFont,
-                        reached && styles.tierTextReached,
-                        styles.saessakText,
-                      ]}
-                    >
-                      {line}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text
-                    key={i}
-                    style={[styles.tierText, fontsLoaded && styles.tierTextFont, reached && styles.tierTextReached]}
-                  >
-                    {line}
-                  </Text>
-                ),
-              )}
+              {tier.label.map((line, i) => (
+                <Text
+                  key={i}
+                  style={[
+                    styles.tierText,
+                    // Cafe24Ssurround 폰트의 '싹'(쌍시옷 초성) 글리프가 Android에서 깨져서(예: "ㅣㅂ"
+                    // 형태로) 렌더링되는 버그 확인됨 — 24px 축소 우회도 결과가 더 나빠서, 이 한 단어만
+                    // 커스텀 폰트를 적용하지 않고 시스템 폰트로 폴백한다.
+                    line !== '새싹' && fontsLoaded && styles.tierTextFont,
+                    reached && styles.tierTextReached,
+                  ]}
+                >
+                  {line}
+                </Text>
+              ))}
             </View>
           );
         })}
@@ -162,13 +154,15 @@ const styles = StyleSheet.create({
     right: 0,
     top: '5.9%',
     textAlign: 'center',
-    fontSize: 24,
+    fontSize: 35,
     fontWeight: '700',
     color: '#535D51',
   },
   ribbonTextFont: {
     fontFamily: 'Cafe24Ssurround',
-    fontWeight: 'normal',
+    // Figma 스펙은 Cafe24 Ssurround OTF Bold인데 번들 폰트는 TTF Regular뿐이라 fontWeight는
+    // 유지해서 OS 합성 볼드(synthetic bold)라도 적용되게 한다.
+    fontWeight: '700',
   },
   tierLabel: {
     position: 'absolute',
@@ -189,17 +183,6 @@ const styles = StyleSheet.create({
   },
   tierTextReached: {
     opacity: 0.51,
-  },
-  saessakWrap: {
-    height: 15,
-    width: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saessakText: {
-    fontSize: 24,
-    lineHeight: 30,
-    transform: [{ scale: 0.5 }],
   },
   stamp: {
     position: 'absolute',
