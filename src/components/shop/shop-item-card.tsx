@@ -37,7 +37,7 @@ export function ShopItemCard({ price, image, placeholderIcon, status, onPress }:
 
 const styles = StyleSheet.create({
   card: {
-    width: '31%',
+    width: '30%',
     aspectRatio: 115 / 155,
     backgroundColor: '#FFFEF5',
     borderRadius: 15,

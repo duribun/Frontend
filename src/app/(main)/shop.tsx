@@ -245,14 +245,16 @@ const styles = StyleSheet.create({
   },
   characterShadow: {
     position: 'absolute',
-    bottom: '-6%',
-    width: '80%',
+    bottom: '1%',
+    width: '38%',
     aspectRatio: 305 / 89,
     alignSelf: 'center',
   },
   character: {
     width: '38%',
-    aspectRatio: 152 / 322,
+    // character-girl.png 실제 픽셀 비율(505x910)을 그대로 사용 — Figma 캐릭터 바운딩박스 비율(152/322)과
+    // 실제 에셋 비율이 달라서 152/322를 쓰면 contain 레터박싱으로 캐릭터가 의도보다 작게 보였다.
+    aspectRatio: 505 / 910,
   },
   panel: {
     position: 'absolute',
@@ -272,8 +274,8 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
     rowGap: 12,
+    columnGap: 12,
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 24,
