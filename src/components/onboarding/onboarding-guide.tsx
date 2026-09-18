@@ -30,6 +30,13 @@ function px(top: number, left: number, width: number, height: number): Highlight
   };
 }
 
+// 메인 화면 아이콘 4개(다이어리/액자/상점/지도)가 원래는 좌측 정렬이라 아이콘마다 가로 중심이 달랐는데,
+// 이번 세션에 (main)/index.tsx의 iconColumn 스타일에 alignItems:'center'가 추가되면서 지금은 4개 전부
+// 같은 가로 중심에 맞춰 렌더링된다(iconColumn left 4%=16.08px + 가장 넓은 아이콘인 지도(78px)의 절반
+// 39px = 55.08px, 402 프레임 기준). 아래 하이라이트들도 그 중심에 맞게 left 값을 하나로 통일했다
+// (하이라이트 폭 71 기준: left = 55.08 - 71/2 ≈ 19.6).
+const ICON_HIGHLIGHT_LEFT = 19.6;
+
 type GuideStep = {
   title: string;
   description: string;
@@ -49,7 +56,14 @@ const STEPS: GuideStep[] = [
   {
     title: '지역을 방문하면 인증!',
     description: 'GPS로 현재 위치를 인증하면 해당 지역의 캐릭터와 게임 내 재화를 획득할 수 있어요.',
-    highlights: [px(626, 57, 285, 166), px(253, 8, 71, 71)],
+    // 표지판 하이라이트: 원래 폭(285)은 여캐가 지금보다 컸을 때 기준이라 표지판 그림(signpost.png 실제
+    // 보이는 너비 ≈233, 402 프레임 기준) 대비 여백이 컸다. 캐릭터 폭 보정에 쓴 것과 같은 배율
+    // (FEMALE_SIZE_SCALE=0.81)을 폭에만 적용해 285→231로 줄이고, 표지판 그림의 실제 가로 중심(≈200.5,
+    // 기존 하이라이트 중심 199.5와 거의 동일)에 맞춰 재배치했다. 세로(top/height)는 액자 아이콘과 별개로
+    // 이미 표지판 위치와 잘 맞아 있어 그대로 뒀다.
+    // 액자 아이콘 하이라이트: 실기 스크린샷 대조 결과 글로우 중심이 실제 아이콘보다 위로 살짝(≈6 단위) 떠
+    // 있어서 top을 253→259로 내려 아이콘과 정확히 겹치게 맞췄다.
+    highlights: [px(626, 84, 231, 166), px(259, ICON_HIGHLIGHT_LEFT, 71, 71)],
     // Figma 원본 프레임(node 497:3679 "설명")에서 실측한 카드 위치: top 397 / 874 ≈ 45.4%.
     // 표지판(하단) 하이라이트와 액자 아이콘(상단) 하이라이트 사이에 정확히 끼워져 있었다.
     cardTopOverride: (397 / 874) * 100,
@@ -59,22 +73,39 @@ const STEPS: GuideStep[] = [
     description: '방문한 지역은 지도에 색으로 표시돼요. 지도에서 추천 관광지도 확인하고, 다음 여행지를 찾아보세요!',
     // NOTE: 문구는 확정, 하이라이트 위치는 get_design_context가 "Subtract"를 이미지로 평탄화해서 정확한 타원 좌표는
     // 못 가져왔다. 화살표 장식이 지도 아이콘 쪽을 가리키고 있어 다른 슬라이드(상점/다이어리)와 동일한 오프셋 패턴으로 추정해 채움.
-    highlights: [px(414, 6, 71, 71)],
+    highlights: [px(414, ICON_HIGHLIGHT_LEFT, 71, 71)],
   },
   {
     title: '포인트를 모아 아이템으로!',
     description: '모은 포인트를 통해 상점에서 다양한 아이템을 구매할 수 있어요.',
-    highlights: [px(333, 10, 71, 71)],
+    highlights: [px(333, ICON_HIGHLIGHT_LEFT, 71, 71)],
   },
   {
     title: '여행을 기록하고 확인하세요!',
     description: '방문한 관광지에 기록을 남기고, 나의 여행을 돌아볼 수 있어요.',
-    highlights: [px(172, 8, 71, 71)],
+    highlights: [px(172, ICON_HIGHLIGHT_LEFT, 71, 71)],
   },
   {
     title: '나만의 캐릭터 꾸미기!',
     description: '획득한 재화로 의상, 소품 등을 구매해 나만의 여행 캐릭터를 자유롭게 꾸밀 수 있어요.',
-    highlights: [px(208, 56, 290, 446)],
+    // 성호님 피드백(실기 스크린샷): 강조 타원이 캐릭터보다 살짝 커 보임 — 특히 머리 위쪽 여백이 큼.
+    // Figma 원본(node 497:3834 "가이드6")의 여캐 박스("여캐" 771:2432, left102/top236/w198/h396)와
+    // 강조 타원(606:4981 "Ellipse 206", left56/top208/w290/h446)을 대조해 원래 여백 비율을 역산했다
+    // (좌우 각 46, 위 28, 아래 22 — 프레임 402x874 기준). 이전 계산(위 옛 주석)은 이 여백을 "캐릭터 폭이
+    // 58%→70%로 커진 배율(1.207)"로 일괄 확대했는데, 실제로는 여캐가 그 후 다시 FEMALE_SIZE_SCALE(0.81)로
+    // 줄어서(최종 폭 56.7%) 이 계산이 안 맞았다 — 화면상 여캐 실측 박스(width≈227.9%→아님 227.9px, left≈87,
+    // top≈218.5, bottom≈629.3, 402x874 프레임, character-girl.png 캔버스 비율 505:910 기준)와 Figma 여캐 박스
+    // (width198/height396)를 비교한 배율(가로 1.151배, 세로 1.037배 — 두 배율이 다른 이유는 Figma 박스는
+    // 정확히 1:2 비율인데 실제 에셋 캔버스 비율은 그와 달라서)을 각각 가로/세로 여백에 곱해 다시 계산했다
+    // (좌우 여백 46→53, 위 여백 28→29, 아래 여백 22→23). 남캐 기준으로는 별도 검증 필요.
+    //
+    // 성호님 피드백 2: 강조가 캐릭터보다 살짝 왼쪽에 있음 — character-girl.png를 PIL로 뜯어보니 그림 자체가
+    // 캔버스 정중앙이 아니라 오른쪽으로 살짝 치우쳐 그려져 있었다(투명 영역 제외한 실제 그림 중심이 캔버스
+    // 중심보다 26px 오른쪽, 캔버스 폭 505 기준). contentFit="contain"은 캔버스 전체를 박스 중앙에 맞추기
+    // 때문에, 실제 캐릭터는 화면상 박스 중심(프레임 x=201)보다 26px(캔버스 비율 환산 시 프레임 기준 약
+    // 11.7 단위) 더 오른쪽에 보인다. 강조 중심도 그만큼 오른쪽으로 옮겨서(기존 left 34 → 46, 폭/높이는 그대로)
+    // 캐릭터의 실제 위치에 맞췄다.
+    highlights: [px(189, 46, 334, 463)],
   },
   {
     title: '더 많은 기능을 활용해보세요!',
@@ -232,7 +263,11 @@ export function OnboardingGuide({ visible, onFinish }: OnboardingGuideProps) {
         renderItem={({ item, index: itemIndex }) => {
           const highlights = itemIndex === STEPS.length - 1 ? headerHighlights : item.highlights;
           return (
-          <View style={{ width: screenWidth, height: screenHeight }} pointerEvents="none">
+          // [다음 버튼 제거 + 터치로 다음 슬라이드] "다음" 버튼을 없앤 대신, 슬라이드 아무 곳이나
+          // 탭하면 goNext()가 실행되도록 감쌌다. FlatList(가로 스와이프)와 겹쳐도 충돌 없이 동작한다 —
+          // 스크롤로 인식될 만큼 손가락이 움직이면 FlatList가 제스처를 가져가고, 움직임이 거의 없는
+          // 탭이면 이 Pressable의 onPress가 실행되는 식으로 RN이 알아서 구분해준다.
+          <Pressable onPress={goNext} style={{ width: screenWidth, height: screenHeight }}>
             <Svg width={screenWidth} height={screenHeight} style={StyleSheet.absoluteFill}>
               <Defs>
                 <Mask id="spotlight-mask" x="0" y="0" width={screenWidth} height={screenHeight}>
@@ -258,7 +293,7 @@ export function OnboardingGuide({ visible, onFinish }: OnboardingGuideProps) {
                 mask="url(#spotlight-mask)"
               />
             </Svg>
-          </View>
+          </Pressable>
           );
         }}
       />
@@ -273,15 +308,14 @@ export function OnboardingGuide({ visible, onFinish }: OnboardingGuideProps) {
         <Text style={styles.title}>{STEPS[index].title}</Text>
         <Text style={styles.description}>{STEPS[index].description}</Text>
 
+        {/* [다음 버튼 제거] Figma 가이드 슬라이드엔 버튼이 없고 페이지 도트만 있음 — 버튼 삭제,
+            도트를 카드 중앙에 배치. 다음 슬라이드로 넘어가는 건 화면 탭(위 Pressable)으로 대체. */}
         <View style={styles.footerRow}>
           <View style={styles.dots}>
             {STEPS.map((_, i) => (
               <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
             ))}
           </View>
-          <Pressable onPress={goNext} style={styles.nextButton}>
-            <Text style={styles.nextButtonLabel}>{isLast ? '시작하기' : '다음'}</Text>
-          </Pressable>
         </View>
       </View>
     </View>
@@ -334,7 +368,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   dots: {
     flexDirection: 'row',
@@ -349,19 +383,6 @@ const styles = StyleSheet.create({
   dotActive: {
     backgroundColor: '#4A7CD6',
     width: 16,
-  },
-  nextButton: {
-    height: 44,
-    paddingHorizontal: 24,
-    borderRadius: 22,
-    backgroundColor: '#4A7CD6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextButtonLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#FEFEFE',
   },
   closingScrim: {
     position: 'absolute',

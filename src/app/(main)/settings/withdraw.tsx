@@ -10,8 +10,11 @@ import { ApiError, withdrawAccount } from '@/lib/api';
 const RED = '#E96B5C';
 const GREEN = '#699447';
 
-// 안내 문구는 와이어프레임 placeholder 상태 그대로다 ("1. 탈퇴 내용으로 바꿔야 됨" 등 미완성 카피) —
-// 실제 콘텐츠가 나오는 대로 교체한다 (docs/ISSUE-설정-구현.md 6번).
+// 성호님 피드백: 안내 문구가 와이어프레임 placeholder 그대로 남아있었다 ("1. 탈퇴 내용으로 바꿔야 됨"
+// 이라는 제목 그 자체, 그 아래 내용도 실제로는 "개인정보 수집·이용 목적" 안내(회원가입 약관에나 맞는
+// 내용)라 회원 탈퇴 화면과 무관했다. 실제 탈퇴 시 동작(withdrawAccount → 계정 삭제, 복구 불가)에 맞는
+// 카피로 바꿨다. 다만 법무/정책 확정 문구는 아니라서, 정식 카피가 나오면 교체 필요 (docs/ISSUE-설정-구현.md
+// 6번 참고).
 export default function WithdrawScreen() {
   const router = useRouter();
   const [agreed, setAgreed] = useState(false);
@@ -47,20 +50,24 @@ export default function WithdrawScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <View style={styles.card}>
-            <Text style={styles.paragraphTitle}>1. 탈퇴 내용으로 바꿔야 됨</Text>
-            <Text style={styles.paragraph}>회사는 다음의 목적을 위하여 개인정보를 수집 및 이용합니다.</Text>
-            <Text style={styles.bullet}>- 서비스 제공 및 문의</Text>
-            <Text style={styles.bullet}>- 사용자 맞춤 서비스 제공</Text>
-            <Text style={styles.bullet}>- 고객 문의 응대</Text>
-
-            <Text style={styles.paragraphTitle}>2. 수집하는 개인정보 항목</Text>
-            <Text style={styles.paragraph}>이 약관에서 사용하는 용어의 정의는 다음과 같습니다.</Text>
-            <Text style={styles.bullet}>- 필수항목: 이메일, 닉네임, 위치 정보 등</Text>
-            <Text style={styles.bullet}>- 선택항목: 프로필 사진 등</Text>
-
-            <Text style={styles.paragraphTitle}>3. 개인정보 보유 및 이용 기간</Text>
+            <Text style={styles.paragraphTitle}>1. 탈퇴 시 안내 사항</Text>
             <Text style={styles.paragraph}>
-              회사는 개인정보 수집 및 이용 목적이 달성되면 지체없이 해당 정보를 파기합니다.
+              회원 탈퇴 시 계정 및 서비스 이용 정보가 모두 삭제되며, 탈퇴 후에는 삭제된 정보를 복구할 수
+              없습니다.
+            </Text>
+            <Text style={styles.bullet}>- 탈퇴는 신중하게 결정해 주세요.</Text>
+            <Text style={styles.bullet}>- 진행 중인 이벤트·혜택이 있다면 탈퇴 전 확인해 주세요.</Text>
+
+            <Text style={styles.paragraphTitle}>2. 삭제되는 정보</Text>
+            <Text style={styles.paragraph}>탈퇴 시 아래 정보가 함께 삭제됩니다.</Text>
+            <Text style={styles.bullet}>- 닉네임, 이메일 등 계정 정보</Text>
+            <Text style={styles.bullet}>- 보유 캐릭터, 재화, 아이템 등 게임 데이터</Text>
+            <Text style={styles.bullet}>- 지역 방문 인증 기록, 기록 사진 등 콘텐츠</Text>
+
+            <Text style={styles.paragraphTitle}>3. 재가입 안내</Text>
+            <Text style={styles.paragraph}>
+              탈퇴 후에도 동일한 소셜 계정으로 다시 가입할 수 있지만, 이전에 이용하던 데이터는 복구되지
+              않고 새로운 계정으로 시작됩니다.
             </Text>
           </View>
 

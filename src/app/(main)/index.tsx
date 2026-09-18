@@ -33,6 +33,23 @@ const PROFILE_SOURCE = {
   MALE: require('@/assets/images/main/profile-boy.png'),
 } as const;
 
+// 여캐(character-girl.png)가 남캐(character-male.png)보다 화면에서 더 커 보인다는 피드백 — 두 에셋을
+// PIL로 직접 뜯어보니 캔버스 대비 실제 캐릭터가 차지하는 폭 비율이 서로 달랐다(여캐 약 88%, 남캐 약 72%,
+// alpha>50 기준 실측). `character` 스타일(width/aspectRatio)은 둘 다 같은 박스로 렌더링하는데, contentFit=
+// "contain"이 각 이미지 자체의 비율대로 맞추기 때문에, 캔버스에 여백이 적은 여캐가 같은 박스 안에서 실제로
+// 더 크게 그려진다. 남캐를 기준으로 맞추기 위해 여캐 렌더링 크기에만 비율(0.72/0.88 ≈ 0.81)을 곱한다.
+const FEMALE_SIZE_SCALE = 0.81;
+const CHARACTER_WIDTH_PERCENT: Record<'FEMALE' | 'MALE', number> = {
+  MALE: 70,
+  FEMALE: 70 * FEMALE_SIZE_SCALE, // ≈ 56.7
+};
+// 그림자 크기도 캐릭터 폭(70%) 기준으로 잡아둔 값(55%)이라, 캐릭터가 줄어드는 만큼 같은 비율로 같이 줄여야
+// 그림자가 캐릭터에 비해 상대적으로 커 보이는 걸 막을 수 있다.
+const CHARACTER_SHADOW_WIDTH_PERCENT: Record<'FEMALE' | 'MALE', number> = {
+  MALE: 55,
+  FEMALE: 55 * FEMALE_SIZE_SCALE, // ≈ 44.55
+};
+
 export default function MainScreen() {
   const router = useRouter();
   const { profile, shouldShowGuide, setShouldShowGuide } = useUserProfile();
@@ -174,12 +191,15 @@ export default function MainScreen() {
             (0~100, 0~100)으로 두고 반지름 50짜리 원을 채운 뒤 preserveAspectRatio="none"으로
             컨테이너 비율(styles.characterShadow의 width/aspectRatio)에 맞게 늘려서 납작한
             타원으로 만든다. */}
-        <Svg style={styles.characterShadow} viewBox="0 0 100 100" preserveAspectRatio="none">
+        <Svg
+          style={[styles.characterShadow, { width: `${CHARACTER_SHADOW_WIDTH_PERCENT[gender]}%` }]}
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none">
           <Ellipse cx={50} cy={50} rx={50} ry={50} fill="rgba(20, 20, 20, 0.22)" />
         </Svg>
         <Image
           source={CHARACTER_SOURCE[gender]}
-          style={styles.character}
+          style={[styles.character, { width: `${CHARACTER_WIDTH_PERCENT[gender]}%` }]}
           contentFit="contain"
           contentPosition="bottom"
         />
@@ -254,15 +274,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   characterShadow: {
+    // width는 성별별로 다르게 주입된다 (CHARACTER_SHADOW_WIDTH_PERCENT 참고).
     position: 'absolute',
     alignSelf: 'center',
     bottom: -6,
-    width: '55%',
     aspectRatio: 9,
     transform: [{ translateX: 10 }],
   },
   character: {
-    width: '70%',
+    // width는 성별별로 다르게 주입된다 (CHARACTER_WIDTH_PERCENT 참고) — 여캐 에셋의 캔버스 여백이
+    // 남캐보다 적어서 같은 박스로 렌더링하면 여캐가 더 커 보이는 걸 보정하기 위함.
     aspectRatio: 200 / 400,
   },
   signpostWrap: {
