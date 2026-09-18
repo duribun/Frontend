@@ -26,14 +26,14 @@ type Tier = {
 // threshold = 칭호 획득에 필요한 마스코트 수 (기획 확정값). 화면에는 표시하지 않고
 // reached 판정 로직(보유 마스코트 수와 비교)에만 사용 — TODO: 실제 보유 수와 연동.
 const TIERS: Tier[] = [
-  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 20.72, topPct: 18.95 },
-  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 79.4, topPct: 18.82 },
-  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 79.55, topPct: 25.61 },
-  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 79.55, topPct: 32.27 },
-  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 79.55, topPct: 38.92 },
-  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 79.55, topPct: 45.71 },
-  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 79.55, topPct: 59.15 },
-  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 79.55, topPct: 72.09 },
+  { id: 'seed', label: ['여행', '새싹'], threshold: 0, leftPct: 18.97, topPct: 19.57 },
+  { id: 'beginner', label: ['여행', '입문자'], threshold: 5, leftPct: 73.85, topPct: 19.45 },
+  { id: 'novice', label: ['초보', '여행가'], threshold: 10, leftPct: 73.85, topPct: 26.1 },
+  { id: 'regional', label: ['지역', '수집가'], threshold: 15, leftPct: 73.85, topPct: 32.62 },
+  { id: 'pioneer', label: ['여행', '개척자'], threshold: 20, leftPct: 73.85, topPct: 39.15 },
+  { id: 'national', label: ['전국', '여행가'], threshold: 30, leftPct: 73.85, topPct: 52.32 },
+  { id: 'master', label: ['마스터', '여행가'], threshold: 40, leftPct: 73.85, topPct: 65.5 },
+  { id: 'legend', label: ['레전드', '여행가'], threshold: 50, leftPct: 73.85, topPct: 78.17 },
 ];
 
 // 도장은 자기 칭호 라벨과 같은 left에, top만 살짝 내려서(=라벨을 덮도록) 찍힌다 — Figma 목업에서
