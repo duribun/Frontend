@@ -118,7 +118,7 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <Image
-        source={require('@/assets/images/map/paper-texture.png')}
+        source={require('@/assets/images/map/paper-texture.jpg')}
         style={styles.texture}
         contentFit="cover"
       />
