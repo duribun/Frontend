@@ -107,8 +107,12 @@ const styles = StyleSheet.create({
     color: '#B04A3C',
   },
   card: {
+    // 성호님 피드백: 카드 배경이 화면 배경(#FEFEFE)과 같은 흰색이라 테두리가 없으니 구분이 안 됐다 —
+    // 설정 목록의 SettingsCard와 동일한 테두리(2px, #EDEDED)를 추가해 카드 영역을 눈에 띄게 했다.
     backgroundColor: '#FEFEFE',
     borderRadius: 14,
+    borderWidth: 2,
+    borderColor: '#EDEDED',
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
