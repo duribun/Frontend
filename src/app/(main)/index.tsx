@@ -11,6 +11,7 @@ import RefreshIcon from '@/assets/icons/main/refresh.svg';
 import SettingsIcon from '@/assets/icons/main/settings.svg';
 import { CoinBadge } from '@/components/main/coin-badge';
 import { IconButton } from '@/components/main/icon-button';
+import { MascotAcquiredOverlay, type AcquiredMascot } from '@/components/collection/mascot-acquired-overlay';
 import { OnboardingGuide } from '@/components/onboarding/onboarding-guide';
 import { ProfileOverlay } from '@/components/profile/profile-overlay';
 import { useSoundSettings } from '@/context/sound-settings-context';
@@ -21,6 +22,12 @@ const SWIPE_THRESHOLD = 60;
 // (main)/map.tsx의 loadDefaultAttractions()와 동일한 이유(실내 등 GPS 신호가 안 잡히는 환경에서
 // getCurrentPositionAsync가 무한 대기하지 않도록)로 타임아웃을 둔다. 값도 그쪽과 동일하게 맞췄다.
 const LOCATION_TIMEOUT_MS = 8000;
+// 에뮬레이터에서 adb geo fix로 좌표를 주입해도 getCurrentPositionAsync(라이브 fix 요청)가 계속
+// timeout나는 걸 확인 — Fused Location Provider가 라이브 요청 자체엔 응답을 안 주는 환경이 있다.
+// expo-location 공식 문서도 "빠른 응답이 필요하고 고정밀이 불필요하면 getLastKnownPositionAsync를
+// 쓰라"고 안내한다. 우리도 지역 인증 반경이 1000m라 고정밀이 필요 없으니, 캐시된 마지막 위치가
+// 이 시간 이내면 먼저 그걸 쓰고, 없거나 너무 오래됐을 때만 라이브 fix로 폴백한다.
+const LAST_KNOWN_LOCATION_MAX_AGE_MS = 60_000;
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -94,6 +101,7 @@ export default function MainScreen() {
   const [coins, setCoins] = useState(0);
   const [regionName, setRegionName] = useState('지역명');
   const [verifyingLocation, setVerifyingLocation] = useState(false);
+  const [acquiredMascot, setAcquiredMascot] = useState<AcquiredMascot | null>(null);
   const [fontsLoaded] = useFonts({
     Cafe24Ssurround: require('@/assets/fonts/Cafe24Ssurround.ttf'),
   });
@@ -181,10 +189,37 @@ export default function MainScreen() {
         return;
       }
 
-      const position = await withTimeout(
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
-        LOCATION_TIMEOUT_MS,
+      // 임시 진단 로그: getLastKnownPositionAsync가 null인 게 "maxAge(60초) 안에 든 캐시가 없어서"인지
+      // "이 기기/에뮬레이터에 위치 자체가 전혀 없어서"인지 구분하기 위해, 제한 없는 조회와
+      // hasServicesEnabledAsync()도 같이 찍어본다.
+      const [servicesEnabled, rawLastKnown] = await Promise.all([
+        Location.hasServicesEnabledAsync(),
+        Location.getLastKnownPositionAsync(),
+      ]);
+      console.warn(
+        '[handleRefreshRegionName] 진단 — servicesEnabled:',
+        servicesEnabled,
+        'rawLastKnown(제한없음):',
+        rawLastKnown,
       );
+
+      // adb geo fix로 좌표를 주입해도 getCurrentPositionAsync(라이브 fix 요청)가 계속 timeout나는
+      // 환경이 있었다 — Fused Location Provider가 라이브 요청 자체엔 응답을 안 주는 경우. 캐시된
+      // 마지막 위치가 있으면 먼저 그걸 쓰고, 없거나 너무 오래됐을 때만 라이브 요청으로 폴백한다.
+      const cachedPosition = await Location.getLastKnownPositionAsync({
+        maxAge: LAST_KNOWN_LOCATION_MAX_AGE_MS,
+      });
+      // 진단 로그로 확인: rawLastKnown이 에뮬레이터 기본 위치(Mountain View, 37.42/-122.08)로 나온 걸
+      // 보면 adb geo fix로 주입한 GPS 좌표가 아니라 훨씬 오래된 네트워크 기반 위치가 캐시돼 있었다.
+      // Accuracy.Balanced는 네트워크 기반 위치를 우선시하는 경향이 있어서, 그쪽 백엔드가 응답을 안 주면
+      // adb geo fix가 실제로 먹이는 GPS_PROVIDER 경로는 요청도 안 가고 영영 대기하는 것으로 보인다.
+      // Highest로 올려서 GPS 우선순위를 높인다(지역 인증 반경 1000m라 정확도가 높아져도 무해함).
+      const position =
+        cachedPosition ??
+        (await withTimeout(
+          Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest }),
+          LOCATION_TIMEOUT_MS,
+        ));
       const { latitude, longitude } = position.coords;
 
       const regions = await getRegions();
@@ -208,13 +243,17 @@ export default function MainScreen() {
       setRegionName(result.regionName);
 
       if (result.isFirstVisit && result.newlyAcquiredMascots.length > 0) {
-        // [비고 2: 마스코트 획득 UI] 전용 축하 팝업/토스트가 아직 없어서, 우선 기존 코드베이스 전반에서
-        // 쓰는 Alert.alert 패턴 그대로 효과음과 함께 안내한다. 더 화려한 UI가 필요하면 후속으로 교체.
+        // docs/ISSUE-마스코트획득화면-Figma연출구현.md — Region과 마스코트가 1:1 매핑이라
+        // newlyAcquiredMascots는 항상 0개 아니면 1개다(BE 쪽 확인 완료). 전용 연출 화면
+        // (MascotAcquiredOverlay)을 띄우고, 효과음은 기존처럼 그대로 재생한다.
         playMascotAcquiredSound();
-        const names = result.newlyAcquiredMascots.map((mascot) => mascot.name).join(', ');
-        Alert.alert('마스코트 획득!', `${names}을(를) 획득했어요!`);
+        setAcquiredMascot({ name: result.newlyAcquiredMascots[0].name, regionName: result.regionName });
       }
-    } catch {
+    } catch (error) {
+      // 임시 디버깅: 원래 catch{}로 실제 에러를 그냥 삼켰는데, 에뮬레이터에서 실패 원인이(권한/GPS
+      // 타임아웃/getRegions·verifyLocation 네트워크 실패 중 어디인지) 안 보여서 콘솔에 남긴다.
+      // Metro 번들러 터미널이나 Logcat에서 이 로그로 실제 원인을 확인할 수 있다.
+      console.warn('[handleRefreshRegionName] 위치 인증 실패:', error);
       Alert.alert('위치 확인 실패', '현재 위치를 확인하지 못했어요. 잠시 후 다시 시도해주세요.');
     } finally {
       setVerifyingLocation(false);
@@ -320,6 +359,7 @@ export default function MainScreen() {
 
       <OnboardingGuide visible={guideVisible} onFinish={() => setGuideVisible(false)} />
       <ProfileOverlay visible={profileVisible} onClose={() => setProfileVisible(false)} />
+      <MascotAcquiredOverlay mascot={acquiredMascot} onConfirm={() => setAcquiredMascot(null)} />
     </View>
   );
 }
