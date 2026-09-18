@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "FE",
-    "slug": "FE",
+    "name": "두리번",
+    "slug": "duribun",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,13 +11,15 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "usesCleartextTraffic": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.duribun.app"
     },
     "web": {
       "output": "static",
@@ -26,11 +28,43 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://devrepo.kakao.com/nexus/content/groups/public/"
+            ]
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      "expo-image",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "여행 기록에 사진을 첨부하기 위해 사진 보관함 접근 권한이 필요해요."
+        }
+      ],
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin",
+      [
+        "@react-native-seoul/kakao-login",
+        {
+          "kakaoAppKey": "b51ac21fa6a00e7c5f7edcacc3789b85"
+        }
+      ],
+      [
+        "@react-native-seoul/naver-login",
+        {
+          "urlScheme": "fe"
         }
       ]
     ],
